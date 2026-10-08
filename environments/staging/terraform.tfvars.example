@@ -1,0 +1,4 @@
+project_name  = "urbanblade"
+environment   = "staging"
+aws_region    = "us-east-1"
+aws_account_id = "209479293733"

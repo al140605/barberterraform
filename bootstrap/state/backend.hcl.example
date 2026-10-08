@@ -1,0 +1,5 @@
+bucket       = "urbanblade-terraform-state-209479293733"
+key          = "bootstrap/state.tfstate"
+region       = "us-east-1"
+encrypt      = true
+use_lockfile = true
