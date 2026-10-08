@@ -26,7 +26,8 @@ administran todavia con Terraform; confirmar su alcance antes de incorporarlos.
 
 El bootstrap necesita AWS CLI/credenciales con permisos para S3 y STS. Verificar la
 identidad con `aws sts get-caller-identity` y confirmar que sea la cuenta indicada
-antes de aplicar. No usar credenciales de otra cuenta.
+antes de aplicar. El proveedor AWS tambien limita las operaciones a `aws_account_id`
+mediante `allowed_account_ids`; no usar credenciales de otra cuenta.
 
 Desde `bootstrap/state`:
 
@@ -65,6 +66,12 @@ El primer plan contiene bloques `import` para los tres ECR y tres CloudWatch Log
 Groups documentados. Confirmar que importa esos seis recursos sin reemplazos,
 eliminaciones ni cambios inesperados antes de aplicar el plan guardado. No aplicar
 si el plan intenta crear duplicados o modificar atributos no previstos.
+
+Los repositorios ECR se configuran con etiquetas inmutables. Publicar cada version
+con una etiqueta unica (por ejemplo, un SHA de commit o numero de version); no
+volver a publicar `latest` ni reutilizar una etiqueta ya existente. Antes de aplicar
+este cambio a repositorios existentes, revisar el plan y coordinar la actualizacion
+de los procesos de despliegue que todavia dependan de etiquetas mutables.
 
 El archivo `backend.hcl.example` usa la clave `staging/terraform.tfstate`; el estado
 del bootstrap usa `bootstrap/state.tfstate`, ambos en el mismo bucket.

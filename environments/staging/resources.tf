@@ -15,7 +15,8 @@ locals {
 resource "aws_ecr_repository" "application" {
   for_each = local.ecr_repositories
 
-  name = each.value
+  name                 = each.value
+  image_tag_mutability = "IMMUTABLE"
 
   lifecycle {
     prevent_destroy = true
