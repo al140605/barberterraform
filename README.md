@@ -19,8 +19,9 @@ administran todavia con Terraform; confirmar su alcance antes de incorporarlos.
 - Terraform >= 1.10 (para `use_lockfile` en el backend S3).
 - AWS CLI configurado con permisos adecuados para la cuenta `209479293733` en
   `us-east-1`.
-- Credenciales de MongoDB Atlas disponibles mediante variables de entorno; nunca
-  guardarlas en `.tfvars`, el repositorio ni el estado.
+- Credenciales de MongoDB Atlas, solo cuando se administren recursos de Atlas: las
+  lee el proveedor de `MONGODB_ATLAS_PUBLIC_API_KEY` y `MONGODB_ATLAS_PRIVATE_API_KEY`;
+  nunca guardarlas en `.tfvars`, el repositorio ni el estado. Hoy no se necesitan.
 
 ## Crear el bucket de estado
 
@@ -67,11 +68,12 @@ Groups documentados. Confirmar que importa esos seis recursos sin reemplazos,
 eliminaciones ni cambios inesperados antes de aplicar el plan guardado. No aplicar
 si el plan intenta crear duplicados o modificar atributos no previstos.
 
-Los repositorios ECR se configuran con etiquetas inmutables. Publicar cada version
-con una etiqueta unica (por ejemplo, un SHA de commit o numero de version); no
-volver a publicar `latest` ni reutilizar una etiqueta ya existente. Antes de aplicar
-este cambio a repositorios existentes, revisar el plan y coordinar la actualizacion
-de los procesos de despliegue que todavia dependan de etiquetas mutables.
+Los repositorios ECR se declaran con etiquetas **mutables**, que es como estan hoy en
+AWS: el despliegue de staging empuja siempre `latest` y las definiciones de tarea de
+ECS la usan. Hacerlas inmutables rompe el siguiente `docker push`. El orden correcto es:
+publicar cada version con una etiqueta unica (SHA de commit), actualizar las
+definiciones de tarea y el flujo de reversion, y solo entonces cambiar
+`image_tag_mutability` a `IMMUTABLE` en una rama aparte, revisando su plan.
 
 El archivo `backend.hcl.example` usa la clave `staging/terraform.tfstate`; el estado
 del bootstrap usa `bootstrap/state.tfstate`, ambos en el mismo bucket.

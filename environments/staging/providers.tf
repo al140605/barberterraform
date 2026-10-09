@@ -11,7 +11,6 @@ provider "aws" {
   }
 }
 
-provider "mongodbatlas" {
-  public_key  = var.atlas_public_key
-  private_key = var.atlas_private_key
-}
+# Las credenciales las toma el propio proveedor de MONGODB_ATLAS_PUBLIC_API_KEY y MONGODB_ATLAS_PRIVATE_API_KEY.
+# Hoy ningun recurso de Atlas se administra aqui, asi que `terraform plan` no las exige.
+provider "mongodbatlas" {}
