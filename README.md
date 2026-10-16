@@ -96,6 +96,26 @@ AWS sea seguro. Eso requiere credenciales y revisar el plan real.
 Para validar solo el codigo sin configurar el backend remoto, usar
 `terraform init -backend=false` y despues `terraform validate`.
 
+## Analisis estatico (T030)
+
+Dos herramientas, ambas sin credenciales de AWS:
+
+```powershell
+# Estilo y errores de Terraform/AWS (config en .tflint.hcl)
+tflint --init
+tflint --chdir=bootstrap/state --config="$PWD/.tflint.hcl"
+tflint --chdir=environments/staging --config="$PWD/.tflint.hcl"
+
+# Seguridad (config en .checkov.yaml)
+checkov --config-file .checkov.yaml
+```
+
+Las excepciones de checkov viven en el codigo, junto al recurso, como
+`#checkov:skip=ID:motivo`. Revisarlas al cambiar el recurso: por ejemplo, las de ECR
+(`CKV_AWS_51` etiquetas mutables y `CKV_AWS_136` cifrado KMS) dependen de pasar a etiquetas por SHA y de
+poder recrear el repositorio. Los grupos de logs de staging retienen 90 dias; produccion debe retener mas.
+
+
 ## Estado y secretos
 
 El backend usa bloqueo nativo S3 (`use_lockfile = true`); no requiere una tabla

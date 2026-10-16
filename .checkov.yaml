@@ -1,0 +1,10 @@
+# Analisis de seguridad de Terraform (T030). Uso, desde la raiz del repo:
+#   checkov --config-file .checkov.yaml
+# Las excepciones estan en el propio codigo como `#checkov:skip=ID:motivo`, junto al recurso.
+framework:
+  - terraform
+directory:
+  - .
+skip-download: true
+compact: true
+quiet: true
