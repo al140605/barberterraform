@@ -1,7 +1,7 @@
 # T032 - Ambiente efimero de prueba (apply y destroy).
 #
-# Crea un ambiente desechable y diminuto (ECR, log group, clúster ECS sin tareas y un grupo de seguridad sin
-# entrada) para comprobar el ciclo completo crear -> verificar -> destruir sin tocar staging.
+# Crea un ambiente desechable y diminuto (ECR, log group y clúster ECS sin tareas; opcionalmente un grupo de
+# seguridad sin entrada) para comprobar el ciclo completo crear -> verificar -> destruir sin tocar staging.
 #
 # - El nombre del ambiente es el WORKSPACE de Terraform y debe empezar por `eph-`: ningun nombre de staging
 #   (`urbanblade-staging`, `urbanblade/barber`, ...) puede coincidir con los de aqui.
@@ -17,8 +17,8 @@ check "expected_aws_account" {
   }
 }
 
-# Guarda del nombre: todo lo demas toma `local.environment` de aqui, asi que no se crea nada si el workspace no
-# cumple (por ejemplo `default`).
+# Guarda del nombre: todos los recursos dependen de ella (`depends_on`), asi que no se crea nada si el workspace no
+# cumple (por ejemplo `default`). El nombre sale directo del workspace para que el plan muestre los nombres reales.
 resource "terraform_data" "guard" {
   input = terraform.workspace
 
@@ -31,7 +31,7 @@ resource "terraform_data" "guard" {
 }
 
 locals {
-  environment = terraform_data.guard.output
+  environment = terraform.workspace
   prefix      = "${var.project_name}-${local.environment}"
 }
 
@@ -43,6 +43,7 @@ resource "aws_ecr_repository" "ephemeral" {
   name                 = "${var.project_name}-ephemeral/${local.environment}"
   image_tag_mutability = "IMMUTABLE"
   force_delete         = true
+  depends_on           = [terraform_data.guard]
 
   image_scanning_configuration {
     scan_on_push = true
@@ -56,13 +57,15 @@ resource "aws_ecr_repository" "ephemeral" {
 resource "aws_cloudwatch_log_group" "ephemeral" {
   name              = "/ecs/${local.prefix}/app"
   retention_in_days = 7
+  depends_on        = [terraform_data.guard]
 
   #checkov:skip=CKV_AWS_338:Ambiente desechable: 7 dias bastan y se borra con el ambiente.
   #checkov:skip=CKV_AWS_158:Ambiente desechable; evita crear y retirar una llave KMS por prueba.
 }
 
 resource "aws_ecs_cluster" "ephemeral" {
-  name = local.prefix
+  name       = local.prefix
+  depends_on = [terraform_data.guard]
 
   setting {
     name  = "containerInsights"
@@ -71,9 +74,12 @@ resource "aws_ecs_cluster" "ephemeral" {
 }
 
 resource "aws_security_group" "ephemeral" {
+  count = var.create_security_group ? 1 : 0
+
   name        = "${local.prefix}-tasks"
   description = "Ambiente efimero ${local.environment}: sin entrada"
   vpc_id      = data.aws_vpc.default.id
+  depends_on  = [terraform_data.guard]
 
   egress {
     description = "HTTPS hacia servicios de AWS"

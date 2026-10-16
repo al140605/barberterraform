@@ -19,6 +19,6 @@ output "ecs_cluster_name" {
 }
 
 output "security_group_id" {
-  description = "Grupo de seguridad del ambiente (sin reglas de entrada)."
-  value       = aws_security_group.ephemeral.id
+  description = "Grupo de seguridad del ambiente (sin reglas de entrada); null si create_security_group = false."
+  value       = one(aws_security_group.ephemeral[*].id)
 }

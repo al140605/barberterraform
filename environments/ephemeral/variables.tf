@@ -10,6 +10,12 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "create_security_group" {
+  description = "Crea tambien un grupo de seguridad de prueba. Requiere el permiso ec2:CreateTags (default_tags etiqueta el grupo); el usuario staging-deploy no lo tiene hoy, por eso es false por defecto."
+  type        = bool
+  default     = false
+}
+
 variable "aws_account_id" {
   description = "Cuenta AWS esperada; protege contra credenciales apuntando a otra cuenta."
   type        = string
