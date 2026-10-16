@@ -15,8 +15,12 @@ locals {
 resource "aws_ecr_repository" "application" {
   for_each = local.ecr_repositories
 
-  name                 = each.value
-  image_tag_mutability = "IMMUTABLE"
+  name = each.value
+
+  # MUTABLE porque el despliegue actual empuja siempre la etiqueta `latest` y las definiciones de tarea de ECS la
+  # usan. Pasar a IMMUTABLE solo despues de publicar con etiqueta unica (SHA) y de actualizar las definiciones de
+  # tarea y el flujo de reversion; de lo contrario el siguiente `docker push` falla.
+  image_tag_mutability = "MUTABLE"
 
   lifecycle {
     prevent_destroy = true

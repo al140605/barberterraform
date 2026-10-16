@@ -20,15 +20,3 @@ variable "aws_account_id" {
   description = "Cuenta AWS esperada; protege contra credenciales apuntando a otra cuenta."
   type        = string
 }
-
-variable "atlas_public_key" {
-  description = "API public key del proveedor MongoDB Atlas, inyectada por entorno."
-  type        = string
-  sensitive   = true
-}
-
-variable "atlas_private_key" {
-  description = "API private key del proveedor MongoDB Atlas, inyectada por entorno."
-  type        = string
-  sensitive   = true
-}
