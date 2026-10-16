@@ -10,6 +10,13 @@ check "expected_aws_account" {
 resource "aws_s3_bucket" "terraform_state" {
   bucket        = var.state_bucket_name
   force_destroy = false
+  # Excepciones de checkov para el bucket de estado (ya tiene bloqueo de acceso publico, versionado, cifrado
+  # AES256 y politica solo-TLS). Los controles siguientes son innecesarios o desproporcionados para estado:
+  #checkov:skip=CKV_AWS_144:Sin replicacion entre regiones por ahora; el bucket tiene versionado habilitado.
+  #checkov:skip=CKV_AWS_145:AES256 basta; KMS agrega costo y dependencia de una llave para el estado.
+  #checkov:skip=CKV_AWS_18:Sin bucket de logs de acceso para el estado por ahora; evaluar CloudTrail como alternativa.
+  #checkov:skip=CKV2_AWS_61:Sin ciclo de vida: el estado versionado se conserva.
+  #checkov:skip=CKV2_AWS_62:Sin notificaciones de eventos; no hay consumidor.
 
   lifecycle {
     prevent_destroy = true
