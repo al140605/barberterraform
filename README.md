@@ -78,6 +78,29 @@ definiciones de tarea y el flujo de reversion, y solo entonces cambiar
 El archivo `backend.hcl.example` usa la clave `staging/terraform.tfstate`; el estado
 del bootstrap usa `bootstrap/state.tfstate`, ambos en el mismo bucket.
 
+## Red y ALB de staging (T024)
+
+`network.tf` y `alb.tf` describen lo que ya existe y lo **importan**; no crean ni destruyen red:
+
+| Recurso | Cantidad | Importado por |
+|---|---|---|
+| Grupos de seguridad (3 de CloudFront por puerto, 1 de las tareas, 1 heredado) | 5 | id del grupo |
+| Balanceador `urbanblade-staging` | 1 | ARN |
+| Target groups (barber, frontend, spark) | 3 | ARN |
+| Listeners HTTP (80, 8080, 8501) | 3 | ARN |
+
+La VPC predeterminada, sus subredes y la lista de prefijos de CloudFront solo se leen con `data` sources.
+Con estos bloques el primer `plan` suma 12 importaciones nuevas a las 6 de ECR y logs. Debe decir
+`will be imported` en todas y no proponer reemplazos (`-/+`) ni eliminaciones: `name` y `description` de un
+grupo de seguridad no se pueden cambiar sin reemplazarlo, por eso replican exactamente lo que hay en AWS.
+Todos los recursos llevan `prevent_destroy`.
+
+Dos cosas se importan **tal cual** y quedan anotadas como pendientes en el codigo (`#checkov:skip`):
+los listeners son HTTP (CloudFront publica el HTTPS y habla HTTP con el origen) y existe un grupo de seguridad
+heredado que ya no esta asociado al balanceador pero sigue nombrado en las reglas del grupo de las tareas.
+Cambiar cualquiera de las dos es una decision aparte, con su propio PR y plan.
+
+
 ## Validacion local sin AWS
 
 Para comprobar sintaxis y formato sin credenciales ni backend remoto:
