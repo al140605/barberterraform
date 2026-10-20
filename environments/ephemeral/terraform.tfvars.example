@@ -1,0 +1,5 @@
+project_name   = "urbanblade"
+aws_region     = "us-east-1"
+aws_account_id = "209479293733"
+# Poner true solo si el usuario de AWS tiene ec2:CreateTags (el grupo de seguridad se etiqueta con default_tags).
+create_security_group = false

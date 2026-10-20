@@ -10,6 +10,7 @@ administran todavia con Terraform; confirmar su alcance antes de incorporarlos.
 
 - `environments/staging/`: configuracion raiz y valores no secretos del staging.
 - `bootstrap/state/`: bucket cifrado/versionado para los estados Terraform.
+- `environments/ephemeral/`: ambiente desechable por workspace (`eph-*`) para probar crear y destruir; ver `docs/AMBIENTE_EFIMERO.md`.
 - `modules/`: guia de los modulos previstos; se agregaran al codificar recursos.
 - `backend.hcl.example`: backend remoto para el estado de staging.
 - `.gitignore`: excluye estado, configuracion local y planes de Terraform.
