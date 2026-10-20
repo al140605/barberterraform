@@ -44,10 +44,12 @@ asociación de proveedores de capacidad del clúster ECS.
 | `environments/staging` | ALB, target groups y listeners | 1 + 3 + 3 importaciones | T024 |
 | `environments/staging` | Clúster ECS, proveedores de capacidad y servicios (barber, frontend) | 1 + 1 + 2 importaciones | T026 |
 | `environments/staging` | Secretos de barber (solo el contenedor, nunca el valor) | 12 importaciones | T026 |
+| `environments/staging` | Distribuciones de CloudFront (frontend, api, spark) | 3 importaciones | T120 |
+| `environments/staging` | Buckets S3 `uploads` y `receipts` (cifrado, bloqueo público, propiedad) y política pública de `uploads` | 2 + 6 + 1 importaciones | T120 |
 | `environments/ephemeral` | Ambiente desechable por workspace `eph-*` | 5 recursos nuevos | T032 |
 
-Staging suma **34 importaciones** (6 + 12 + 16). Lo que **no** está en Terraform todavía: distribuciones de CloudFront y
-certificados, buckets S3 de recibos, subidas y respaldos, servicios `spark` y `ollama` (con su ECR, logs y secretos),
+Staging suma **46 importaciones** (6 + 12 + 16 + 12). Lo que **no** está en Terraform todavía: certificados ACM, el
+bucket S3 de respaldos, servicios `spark` y `ollama` (con su ECR, logs y secretos),
 roles IAM y MongoDB Atlas. La VPC predeterminada se lee, no se administra.
 
 ## Variables (`environments/staging/variables.tf`)
@@ -73,6 +75,7 @@ Credenciales de AWS y de Atlas **siempre** por variables de entorno, nunca en `.
 | `alb_dns_name`, `alb_arn`, `alb_listeners`, `target_group_arns` | ALB, qué puerto reenvía a qué target group y sus ARN. |
 | `ecs_cluster_name`, `ecs_service_names` | Clúster y servicios ECS. |
 | `barber_secret_names` | Nombres (nunca valores) de los secretos de barber. |
+| `cloudfront_distributions`, `s3_bucket_names` | ID, dominio y alias de cada distribución; nombres de los buckets. |
 
 Ninguna salida es sensible. Los valores de los secretos no existen en Terraform.
 
