@@ -7,7 +7,7 @@ concretos **no** están aquí: se obtienen con `terraform output` o con los `des
 
 ```mermaid
 flowchart LR
-    U([Usuarios]) -->|HTTPS| CF["CloudFront<br/>frontend · API · spark<br/>(fuera de Terraform)"]
+    U([Usuarios]) -->|HTTPS| CF["CloudFront<br/>frontend · API · spark<br/>(T118: descrito, sin plan)"]
     CF -->|"HTTP 80 / 8080 / 8501<br/>solo rangos de CloudFront"| ALB
 
     subgraph TF ["Administrado con Terraform"]
@@ -46,11 +46,12 @@ asociación de proveedores de capacidad del clúster ECS.
 | `environments/staging` | Secretos de barber (solo el contenedor, nunca el valor) | 12 importaciones | T026 |
 | `environments/staging` | Distribuciones de CloudFront (frontend, api, spark) | 3 importaciones | T120 |
 | `environments/staging` | Buckets S3 `uploads` y `receipts` (cifrado, bloqueo público, propiedad) y política pública de `uploads` | 2 + 6 + 1 importaciones | T120 |
+| `environments/staging` | Clúster Atlas M0 y 4 usuarios de base de datos (sin contraseñas) | 1 + 4 importaciones, sin plan aún | T118 |
 | `environments/ephemeral` | Ambiente desechable por workspace `eph-*` | 5 recursos nuevos | T032 |
 
-Staging suma **46 importaciones** (6 + 12 + 16 + 12). Lo que **no** está en Terraform todavía: certificados ACM, el
-bucket S3 de respaldos, servicios `spark` y `ollama` (con su ECR, logs y secretos),
-roles IAM y MongoDB Atlas. La VPC predeterminada se lee, no se administra.
+Staging suma **51 importaciones** (6 + 12 + 16 + 12 + 5; las de Atlas aún sin plan). Lo que **no** está en Terraform todavía: certificados ACM, la
+lista de acceso de red de Atlas, el bucket S3 de respaldos, servicios `spark` y `ollama` (con su ECR, logs y secretos),
+roles IAM y la contraseña de cada usuario de Atlas. La VPC predeterminada se lee, no se administra.
 
 ## Variables (`environments/staging/variables.tf`)
 
@@ -75,6 +76,7 @@ Credenciales de AWS y de Atlas **siempre** por variables de entorno, nunca en `.
 | `alb_dns_name`, `alb_arn`, `alb_listeners`, `target_group_arns` | ALB, qué puerto reenvía a qué target group y sus ARN. |
 | `ecs_cluster_name`, `ecs_service_names` | Clúster y servicios ECS. |
 | `barber_secret_names` | Nombres (nunca valores) de los secretos de barber. |
+| `atlas_cluster_name`, `atlas_database_usernames` | Clúster y usuarios de Atlas (nunca contraseñas ni cadenas de conexión). |
 | `cloudfront_distributions`, `s3_bucket_names` | ID, dominio y alias de cada distribución; nombres de los buckets. |
 
 Ninguna salida es sensible. Los valores de los secretos no existen en Terraform.
