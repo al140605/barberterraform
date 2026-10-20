@@ -98,3 +98,14 @@ output "s3_bucket_names" {
   description = "Buckets S3 de la plataforma (uploads publico de solo lectura y receipts privado)."
   value       = { for key, bucket in aws_s3_bucket.storage : key => bucket.id }
 }
+
+# T118 - Atlas. Solo nombres; las cadenas de conexion llevan credenciales y no se exponen.
+output "atlas_cluster_name" {
+  description = "Nombre del clúster de Atlas administrado."
+  value       = mongodbatlas_advanced_cluster.staging.name
+}
+
+output "atlas_database_usernames" {
+  description = "Usuarios de base de datos de Atlas administrados (sin contraseñas)."
+  value       = sort([for user in mongodbatlas_database_user.staging : user.username])
+}

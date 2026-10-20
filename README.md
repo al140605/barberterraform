@@ -146,6 +146,32 @@ Cambiar cualquiera de las dos es una decision aparte, con su propio PR y plan.
 - Falta el `plan` real: depende del estado remoto (T115) y de credenciales con lectura de CloudFront y S3.
 
 
+## MongoDB Atlas (T118)
+
+`atlas.tf` describe el clúster y los usuarios de base de datos para importarlos. **No se ha ejecutado ningun plan**:
+faltan datos que solo se ven en Atlas y las credenciales de su API.
+
+| Recurso | Cantidad | Importado por |
+|---|---|---|
+| Clúster gratuito (M0) sobre AWS | 1 | `<id-proyecto>-<nombre-cluster>` |
+| Usuarios `laravel_core_rw`, `laravel_analytics_reader`, `spark_core_reader` y `ANALYTIC` | 4 | `<id-proyecto>-<usuario>-admin` |
+
+Datos que hay que dar (no estan en ningun archivo del repo; van en `terraform.tfvars`, que Git ignora):
+`atlas_project_id` (24 caracteres hexadecimales, Project Settings), `atlas_cluster_name` y `atlas_region`
+(por defecto `US_EAST_1`; debe coincidir con la real). Credenciales de la API: `MONGODB_ATLAS_PUBLIC_API_KEY` y
+`MONGODB_ATLAS_PRIVATE_API_KEY`, de una llave con rol **Project Read Only** mientras solo se haga `plan`.
+
+- Todo lleva `prevent_destroy`. Si la region o el nivel no coinciden con Atlas, el plan debe **fallar**, no proponer
+  reemplazar el clúster: en M0 no hay respaldo en la nube y reemplazar es perder los datos.
+- Los usuarios llevan `ignore_changes = [password]`. Nunca declarar contraseñas ni `*_wo`: viven en Secrets Manager y
+  en los `.env`, y no deben pasar por el codigo ni por el estado.
+- Fuera de alcance: el usuario personal `luis` (excepcion aceptada del propietario) y la lista de acceso de red de
+  Atlas. De esta ultima hoy se desconoce el contenido; para incorporarla hay que leerla (`atlas accessLists list`) y
+  anadir `mongodbatlas_project_ip_access_list` con sus entradas reales.
+- El primer `plan` debe mostrar solo `will be imported` en los 5 recursos, sin cambios. Cualquier `must be replaced`
+  o `will be updated` significa que un valor declarado no coincide: corregir el codigo, nunca aplicar.
+
+
 ## Validacion local sin AWS
 
 Para comprobar sintaxis y formato sin credenciales ni backend remoto:

@@ -2,3 +2,7 @@ project_name  = "urbanblade"
 environment   = "staging"
 aws_region    = "us-east-1"
 aws_account_id = "209479293733"
+# T118 - Se ven en Atlas. El ID del proyecto es de 24 caracteres hexadecimales.
+atlas_project_id   = "000000000000000000000000"
+atlas_cluster_name = "NOMBRE_DEL_CLUSTER"
+atlas_region       = "US_EAST_1"
