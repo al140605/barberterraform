@@ -101,6 +101,26 @@ heredado que ya no esta asociado al balanceador pero sigue nombrado en las regla
 Cambiar cualquiera de las dos es una decision aparte, con su propio PR y plan.
 
 
+## ECS y secretos de barber (T026)
+
+`ecs.tf` y `secrets.tf` importan lo que ya corre; el despliegue de las aplicaciones sigue siendo del pipeline.
+
+| Recurso | Cantidad | Importado por |
+|---|---|---|
+| Clúster `urbanblade-staging` y sus proveedores de capacidad (FARGATE, FARGATE_SPOT por defecto) | 2 | nombre del clúster |
+| Servicios `uba-stg-barber` y `uba-stg-frontend` | 2 | `clúster/servicio` |
+| Secretos `urbanblade/staging/barber/*` (solo el contenedor, nunca el valor) | 12 | ARN |
+
+- Los servicios llevan `ignore_changes = [task_definition, desired_count]`: el pipeline registra revisiones nuevas y
+  escala sin que Terraform las revierta. La definicion de tarea no se administra aqui; se lee la ultima revision
+  activa de cada familia solo para satisfacer el argumento obligatorio al importar.
+- Nunca declarar `aws_secretsmanager_secret_version` para estos secretos: el valor lo gestiona otro proceso y no
+  debe pasar por el codigo ni por el estado. Son exactamente los 12 que lee la tarea de barber.
+- `spark` y `ollama` (servicios, secretos de spark, ECR y logs de ollama) quedan fuera de este alcance.
+- Con este PR el primer `plan` suma 16 importaciones (clúster, proveedores, 2 servicios y 12 secretos). Debe
+  decir `will be imported` en todas y no proponer reemplazos ni eliminaciones.
+
+
 ## Validacion local sin AWS
 
 Para comprobar sintaxis y formato sin credenciales ni backend remoto:
