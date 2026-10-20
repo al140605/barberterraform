@@ -81,3 +81,20 @@ output "barber_secret_names" {
   description = "Nombres de los secretos de barber en Secrets Manager (nunca sus valores)."
   value       = sort([for secret in aws_secretsmanager_secret.barber : secret.name])
 }
+
+# T120 - CloudFront y S3. Nombres y dominios publicos; nada sensible.
+output "cloudfront_distributions" {
+  description = "Distribuciones de CloudFront (frontend, api, spark): ID, dominio de CloudFront y alias propios."
+  value = {
+    for key, dist in aws_cloudfront_distribution.staging : key => {
+      id      = dist.id
+      domain  = dist.domain_name
+      aliases = sort(tolist(dist.aliases))
+    }
+  }
+}
+
+output "s3_bucket_names" {
+  description = "Buckets S3 de la plataforma (uploads publico de solo lectura y receipts privado)."
+  value       = { for key, bucket in aws_s3_bucket.storage : key => bucket.id }
+}

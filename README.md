@@ -123,6 +123,29 @@ Cambiar cualquiera de las dos es una decision aparte, con su propio PR y plan.
   decir `will be imported` en todas y no proponer reemplazos ni eliminaciones.
 
 
+## CloudFront y S3 (T120)
+
+`cdn.tf` y `storage.tf` importan lo que ya sirve el trafico y guarda los archivos. Valores leidos de AWS en solo lectura
+(`cloudfront get-distribution-config` y `s3api get-*`) y replicados tal cual.
+
+| Recurso | Cantidad | Importado por |
+|---|---|---|
+| Distribuciones de CloudFront: `frontend` (urbanblade.com.mx y www), `api` y `spark`, las tres hacia el ALB | 3 | ID de la distribucion |
+| Buckets `urbanblade-staging-uploads-*` (publico, solo lectura) y `urbanblade-staging-receipts-*` (privado) | 2 | nombre |
+| Cifrado AES256, bloqueo de acceso publico y propiedad de objetos de cada bucket | 6 | nombre del bucket |
+| Politica de lectura publica de `uploads` (solo `GetObject`) | 1 | nombre del bucket |
+
+- El certificado ACM se referencia por ARN; no se administra aqui. Las politicas de cache y de solicitud al origen son las
+  administradas por AWS (CachingDisabled y AllViewer): nada se cachea en el borde.
+- `uploads` tiene el bloqueo de politica publica **apagado a proposito**: sirve imagenes por URL publica. `receipts` lo
+  tiene todo bloqueado. No cambiar ninguno sin revisar el plan.
+- El bucket de respaldos de la Fase 5 (`urbanblade-backups-*`) queda fuera de este alcance.
+- Las etiquetas por defecto del proveedor (`Project`, `Environment`, `ManagedBy`) se agregan en sitio a los 5 recursos
+  que las admiten (3 distribuciones y 2 buckets); es el unico cambio esperado en el primer `plan`, ademas de las
+  12 importaciones nuevas (3 distribuciones, 2 buckets, 6 configuraciones de bucket y 1 politica). No debe proponer reemplazos ni eliminaciones.
+- Falta el `plan` real: depende del estado remoto (T115) y de credenciales con lectura de CloudFront y S3.
+
+
 ## Validacion local sin AWS
 
 Para comprobar sintaxis y formato sin credenciales ni backend remoto:
