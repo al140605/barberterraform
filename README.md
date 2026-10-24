@@ -221,3 +221,27 @@ Los secretos existentes de Secrets Manager se incorporaran sin declarar sus valo
 en Terraform. Importar recursos no equivale a importar el valor secreto; evitar
 recursos `aws_secretsmanager_secret_version` para secretos gestionados fuera de este
 repositorio.
+
+## Pipeline (T043 a T046)
+
+`.github/workflows/terraform.yml` valida cada cambio y, cuando el repositorio tiene sus secretos, planea y aplica staging.
+
+| Paso | Cuándo corre | Qué hace |
+|---|---|---|
+| `formato` (T044) | cada PR y cada push a `main` | `terraform fmt -check -recursive` |
+| `validar` (T044) | igual | `init -backend=false` y `validate` en `bootstrap/state`, `environments/staging` y `environments/ephemeral`; en el efímero también `terraform test` |
+| `analisis` (T030) | igual | `tflint` y `checkov` con `.tflint.hcl` y `.checkov.yaml` |
+| `plan` (T045) | si `TERRAFORM_PLAN = true` | `terraform plan` de staging; el resumen del job lista cada recurso y su acción (sin atributos) |
+| `aplicar` (T046) | solo a mano, desde `main` | `terraform apply` del plan, detrás del entorno `staging-aprobacion` |
+
+`fmt`, `validate`, `tflint`, `checkov` y `terraform test` no necesitan credenciales. `plan` y `aplicar` sí, y **nada de eso va en el código** (T043). Hay que crearlo una vez en GitHub, en *Settings*:
+
+1. **Secrets and variables > Actions > Secrets** (repositorio):
+   - `AWS_ROLE_ARN`: rol de IAM que GitHub asume por OIDC (confianza con `token.actions.githubusercontent.com`, limitada a este repo y a la rama `main`).
+   - `TF_BACKEND_HCL`: contenido del `backend.hcl` de staging (ver `backend.hcl.example`).
+   - `TF_VAR_AWS_ACCOUNT_ID`, `TF_VAR_ATLAS_PROJECT_ID`, `TF_VAR_ATLAS_CLUSTER_NAME`: valores de las variables del mismo nombre.
+   - `MONGODB_ATLAS_PUBLIC_API_KEY` y `MONGODB_ATLAS_PRIVATE_API_KEY`: llaves de API de Atlas.
+2. **Variables**: `TERRAFORM_PLAN = true`, para activar el job `plan`. Sin ella solo corren las validaciones.
+3. **Environments**: crear `staging-aprobacion` y agregar a una o más personas en *Required reviewers*. Sin esa regla el `apply` no esperaría aprobación.
+
+El `apply` nunca es automático: se lanza con *Actions > Terraform > Run workflow*, desde `main`, marcando «aplicar»; el job queda en espera hasta que una persona revisora lo apruebe. Como el repositorio es público, los registros también lo son: el workflow no imprime el plan ni sube el archivo del plan como artefacto.
