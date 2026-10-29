@@ -245,3 +245,11 @@ repositorio.
 3. **Environments**: crear `staging-aprobacion` y agregar a una o más personas en *Required reviewers*. Sin esa regla el `apply` no esperaría aprobación.
 
 El `apply` nunca es automático: se lanza con *Actions > Terraform > Run workflow*, desde `main`, marcando «aplicar»; el job queda en espera hasta que una persona revisora lo apruebe. Como el repositorio es público, los registros también lo son: el workflow no imprime el plan ni sube el archivo del plan como artefacto.
+
+## Políticas y licencia
+
+- [GNU GPLv3, versión 3 únicamente](LICENSE) — GPL-3.0-only.
+- [Alcance de la licencia y componentes de terceros](LICENSING.md).
+- [Política de seguridad y reporte privado](SECURITY.md).
+- [Cómo contribuir](CONTRIBUTING.md).
+- [Código de conducta](CODE_OF_CONDUCT.md).
