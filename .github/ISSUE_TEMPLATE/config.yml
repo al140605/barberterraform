@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Reportar una vulnerabilidad en privado
+    url: https://github.com/KikeGonRam/barber/security/advisories/new
+    about: Indica el componente barberterraform; no publiques información sensible.
+  - name: Documentación del proyecto
+    url: https://github.com/al140605/barberterraform/blob/main/README.md
+    about: Revisa instalación, arquitectura y validaciones antes de abrir un issue.

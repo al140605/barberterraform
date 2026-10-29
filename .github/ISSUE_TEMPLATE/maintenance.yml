@@ -1,0 +1,23 @@
+name: Proponer mantenimiento
+description: Mejora de documentación, pruebas o calidad del repositorio.
+title: "[Mantenimiento]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema y fuente afectada
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Resultado esperado y forma de comprobarlo
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impacto operativo
+      description: Distingue documentación de cambios que requieren infraestructura o publicación.
+    validations:
+      required: true

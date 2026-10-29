@@ -1,0 +1,29 @@
+name: Reportar un fallo
+description: Describe un problema reproducible con evidencia depurada.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        No incluyas secretos, datos personales ni archivos de configuración reales.
+        Para vulnerabilidades usa el canal privado indicado en SECURITY.md.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema y resultado esperado
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos mínimos con datos ficticios
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Entorno y commit evaluado
+      description: No adjuntes estado, planes ni credenciales de AWS o Atlas.
+    validations:
+      required: true
