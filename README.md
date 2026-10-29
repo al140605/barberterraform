@@ -252,7 +252,9 @@ repositorio.
 `.github/workflows/terraform.yml` define validaciones para PR y push a main con rutas
 relevantes. El plan exige habilitación explícita; apply requiere además ejecución
 manual y sus protecciones. El workflow figuraba desactivado en la revisión del
-28-oct-2026: tener el YAML o los secretos no acredita una ejecución remota.
+28-oct-2026. Después se habilitó solo la validación, con TERRAFORM_PLAN=false;
+la evidencia y el fallo inicial de checksums están en [CI_TERRAFORM.md](docs/CI_TERRAFORM.md).
+Tener el YAML o los secretos no acredita una ejecución remota satisfactoria.
 
 | Paso | Cuándo corre | Qué hace |
 |---|---|---|

@@ -21,7 +21,9 @@ no se publica porque incluye bloques de código y metadatos de infraestructura.
 Este registro documenta propuestas de clasificación, no aceptación del riesgo.
 El propietario y quienes mantengan infraestructura y aplicaciones deben acordar
 responsable, fecha de revisión y evidencia para cada cambio operativo; esas
-asignaciones siguen pendientes. Revisar antes del primer plan conectado y cada
+asignaciones siguen pendientes. El acuerdo se coordina en [#14](https://github.com/al140605/barberterraform/issues/14)
+y las protecciones previas al plan en [#13](https://github.com/al140605/barberterraform/issues/13).
+Revisar antes del primer plan conectado y cada
 vez que cambien recursos, arquitectura o versión de Checkov.
 
 No retirar skips para mejorar una cifra ni agregar exclusiones generales. Para
