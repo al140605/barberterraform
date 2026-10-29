@@ -56,7 +56,16 @@ TERRAFORM_PLAN=true. Requiere los nombres siguientes; no se documentan valores:
 - MONGODB_ATLAS_PUBLIC_API_KEY y MONGODB_ATLAS_PRIVATE_API_KEY.
 
 AWS usa OIDC. La confianza y los permisos del rol deben revisarse para el repositorio,
-rama y operaciones autorizadas. Atlas requiere acceso compatible con la lectura del
+rama y operaciones autorizadas. Con el formato de subject basado en nombres, el sub
+del job plan sin environment corresponde a repo:al140605/barberterraform:ref:refs/heads/main;
+el de apply con environment corresponde a repo:al140605/barberterraform:environment:staging-aprobacion.
+Estos son ejemplos, no una política IAM verificada: repositorios nuevos desde
+el 15-jul-2026 o que adoptaron subjects inmutables incluyen IDs de propietario y
+repositorio. Verificar formato real y personalizaciones de OIDC antes de configurar el rol. La protección del
+entorno debe restringir ramas y revisores; no sustituir condiciones específicas
+por comodines para hacer funcionar la autenticación. Un rol de lectura de recursos
+también necesita permisos explícitos del backend para su bloqueo; esto no autoriza apply.
+Atlas requiere acceso compatible con la lectura del
 plan. No se crean o cambian esas cuentas desde este mantenimiento.
 
 El job valida la presencia de configuración sin imprimir valores.
@@ -149,3 +158,6 @@ La existencia del código no acredita importaciones aplicadas ni funcionamiento 
 [Terraform plan](https://developer.hashicorp.com/terraform/cli/commands/plan) ·
 [Mocks de proveedores](https://developer.hashicorp.com/terraform/language/tests/mocking) ·
 [OIDC en AWS con GitHub Actions](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws).
+
+La revisión de omisiones y criterios para retirar excepciones está en
+[EXCEPCIONES_CHECKOV.md](EXCEPCIONES_CHECKOV.md).

@@ -1,16 +1,19 @@
 # Infraestructura de staging (T029)
 
-Qué existe en AWS (cuenta `209479293733`, `us-east-1`), qué parte administra Terraform y cómo se conecta. Los IDs y ARN
-concretos **no** están aquí: se obtienen con `terraform output` o con los `describe-*` de AWS.
+Inventario derivado del código de staging, revisado el 28-oct-2026. Describe la
+arquitectura declarada y los recursos previstos para importación; no certifica
+el estado remoto ni la configuración actual de AWS/Atlas. Algunos identificadores
+están en los archivos Terraform: son metadatos de infraestructura, no credenciales.
+No publicar estados, planes completos, contraseñas ni valores de secretos.
 
 ## Diagrama
 
 ```mermaid
 flowchart LR
-    U([Usuarios]) -->|HTTPS| CF["CloudFront<br/>frontend · API · spark<br/>(T118: descrito, sin plan)"]
+    U([Usuarios]) -->|HTTPS| CF["CloudFront<br/>frontend · API · spark<br/>(T120: declarado)"]
     CF -->|"HTTP 80 / 8080 / 8501<br/>solo rangos de CloudFront"| ALB
 
-    subgraph TF ["Administrado con Terraform"]
+    subgraph TF ["Declarado para adopción con Terraform"]
         ALB["ALB urbanblade-staging<br/>3 listeners HTTP"]
         ALB -->|80| TGF["target group frontend :3000"]
         ALB -->|8080| TGB["target group barber :80"]
@@ -25,16 +28,19 @@ flowchart LR
         SG["Grupos de seguridad<br/>3 de CloudFront + tareas + heredado"] -.-> ALB
         SG -.-> SF
         SG -.-> SB
+        SB -->|archivos| UP[("S3 uploads<br/>lectura pública") ]
+        SB -->|recibos| RC[("S3 receipts<br/>privado") ]
+        ATLAS[("MongoDB Atlas M0<br/>(T118: declarado)")]
     end
 
     TGS --> SS["ECS uba-stg-spark<br/>(fuera de Terraform)"]
-    SB -->|"IP publica"| ATLAS[("MongoDB Atlas M0<br/>(fuera de Terraform)")]
+    SB -->|"IP pública"| ATLAS
 ```
 
 Línea continua = tráfico; punteada = uso o pertenencia. Los recursos del recuadro llevan `prevent_destroy`, salvo la
 asociación de proveedores de capacidad del clúster ECS.
 
-## Qué administra Terraform hoy
+## Inventario declarado
 
 | Raíz | Recurso | Cantidad | Origen |
 | --- | --- | --- | --- |
@@ -46,11 +52,12 @@ asociación de proveedores de capacidad del clúster ECS.
 | `environments/staging` | Secretos de barber (solo el contenedor, nunca el valor) | 12 importaciones | T026 |
 | `environments/staging` | Distribuciones de CloudFront (frontend, api, spark) | 3 importaciones | T120 |
 | `environments/staging` | Buckets S3 `uploads` y `receipts` (cifrado, bloqueo público, propiedad) y política pública de `uploads` | 2 + 6 + 1 importaciones | T120 |
-| `environments/staging` | Clúster Atlas M0 y 4 usuarios de base de datos (sin contraseñas) | 1 + 4 importaciones, sin plan aún | T118 |
+| `environments/staging` | Clúster Atlas M0 y 4 usuarios de base de datos (sin contraseñas) | 1 + 4 importaciones declaradas | T118 |
 | `environments/ephemeral` | Ambiente desechable por workspace `eph-*` | 5 recursos nuevos | T032 |
 
-Staging suma **51 importaciones** (6 + 12 + 16 + 12 + 5; las de Atlas aún sin plan). Lo que **no** está en Terraform todavía: certificados ACM, la
-lista de acceso de red de Atlas, el bucket S3 de respaldos, servicios `spark` y `ollama` (con su ECR, logs y secretos),
+Staging suma **51 importaciones** (6 + 12 + 16 + 12 + 5; la incorporación al estado no se acredita aquí). Lo que **no** está en Terraform todavía: certificados ACM, la
+lista de acceso de red de Atlas, el bucket S3 de respaldos, el servicio ECS y secretos de `spark`, así como el servicio, ECR, logs y secretos
+de `ollama` (ECR y logs de `spark` sí están declarados),
 roles IAM y la contraseña de cada usuario de Atlas. La VPC predeterminada se lee, no se administra.
 
 ## Variables (`environments/staging/variables.tf`)
@@ -61,6 +68,9 @@ roles IAM y la contraseña de cada usuario de Atlas. La VPC predeterminada se le
 | `environment` | string | `staging` | Etiqueta `Environment`. |
 | `aws_region` | string | `us-east-1` | Región del proveedor. |
 | `aws_account_id` | string | sin valor (obligatoria) | Cuenta esperada: el proveedor se niega a operar en otra. |
+| `atlas_project_id` | string | sin valor (obligatoria) | ID del proyecto; 24 caracteres hexadecimales. |
+| `atlas_cluster_name` | string | sin valor (obligatoria) | Nombre real del clúster. |
+| `atlas_region` | string | `US_EAST_1` | Región de Atlas; debe coincidir con el clúster. |
 
 Se definen en `terraform.tfvars` (copiado de `terraform.tfvars.example`; el archivo real está en `.gitignore`).
 Credenciales de AWS y de Atlas **siempre** por variables de entorno, nunca en `.tfvars`.
@@ -79,18 +89,33 @@ Credenciales de AWS y de Atlas **siempre** por variables de entorno, nunca en `.
 | `atlas_cluster_name`, `atlas_database_usernames` | Clúster y usuarios de Atlas (nunca contraseñas ni cadenas de conexión). |
 | `cloudfront_distributions`, `s3_bucket_names` | ID, dominio y alias de cada distribución; nombres de los buckets. |
 
-Ninguna salida es sensible. Los valores de los secretos no existen en Terraform.
+Estas salidas exponen metadatos, no valores de secretos. Que un output no esté
+marcado sensitive no convierte el estado completo en información publicable.
+Terraform solo declara los contenedores de Secrets Manager, sin secret_version.
 
-## Cómo regenerar la evidencia
+## Evidencia por nivel
 
-1. `terraform -chdir=environments/staging validate` y `terraform fmt -check -recursive`.
-2. Con credenciales de **solo lectura**: `terraform -chdir=environments/staging plan -out staging.tfplan`. El plan se
-   aprueba solo si todas las importaciones dicen `will be imported` y no hay `-/+` ni `- destroy`.
-3. `terraform -chdir=environments/staging output` y comparar con el diagrama.
+1. **Local:** formato, validate en tres raíces, prueba mock y pruebas del resumen;
+   procedimiento y límites en [CI_TERRAFORM.md](CI_TERRAFORM.md).
+2. **CI:** URL de la ejecución y SHA exacto, con todos los controles requeridos aprobados.
+   Un workflow desactivado no aporta esa evidencia.
+3. **Plan conectado, solo con autorización:** backend correcto, identidad verificada,
+   lectura de recursos y permisos necesarios para el bloqueo del estado. Un rol de
+   lectura de recursos no implica que pueda bloquear el backend S3.
+4. **Revisión:** examinar importaciones, cambios en sitio, reemplazos, eliminaciones,
+   outputs y drift. Las etiquetas del proveedor pueden proponer cambios en sitio;
+   deben quedar identificados y aprobados. Un recurso ya importado puede no aparecer
+   como una nueva importación. Conservar el plan completo únicamente en un canal privado.
+5. **Estado y operación:** outputs solo reflejan el estado disponible; no sustituyen
+   un plan actualizado ni una comprobación funcional. Una aplicación autorizada
+   necesita su propia evidencia; no se realizó durante esta revisión.
 
-## Hallazgos conocidos (se importan tal cual; ver `#checkov:skip` en el código)
+## Hallazgos del código (pendientes de contraste con el entorno)
 
 - Los listeners del ALB son HTTP: CloudFront publica el HTTPS y habla HTTP con el origen.
-- Un grupo de seguridad heredado acepta `0.0.0.0/0` en 80, 8080 y 8501, ya no está asociado al ALB y aún aparece en las
-  reglas del grupo de las tareas.
+- Un grupo de seguridad heredado acepta `0.0.0.0/0` en 80, 8080 y 8501, el código no lo asocia al ALB, pero aún aparece en las
+  reglas del grupo de las tareas. Su uso real necesita verificación autorizada.
 - El ALB no tiene protección contra borrado, registros de acceso ni WAF.
+
+El [registro de excepciones de Checkov](EXCEPCIONES_CHECKOV.md) detalla alcance,
+riesgos y criterios de revisión. Los motivos inline no acreditan aceptación del riesgo.

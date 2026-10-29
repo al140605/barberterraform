@@ -2,16 +2,17 @@
 
 Este repositorio gestiona la infraestructura compartida de UrbanBlade:
 AWS (ECS/Fargate, ALB, CloudFront, ECR y S3) y MongoDB Atlas. El bootstrap declara
-un bucket dedicado al estado; staging declara los repositorios ECR y grupos de logs
-existentes con importaciones explicitas. Los demas recursos de staging no se
-administran todavia con Terraform; confirmar su alcance antes de incorporarlos.
+un bucket dedicado al estado; staging declara ECR, logs, red, ALB, ECS, contenedores
+de secretos, CloudFront, S3 y Atlas mediante bloques de importación. Declararlos
+no demuestra que estén incorporados al estado remoto ni que coincidan con el entorno.
+La evidencia de esta revisión es estática y local; no se ejecutó un plan conectado.
 
 ## Estructura
 
 - `environments/staging/`: configuracion raiz y valores no secretos del staging.
 - `bootstrap/state/`: bucket cifrado/versionado para los estados Terraform.
 - `environments/ephemeral/`: ambiente desechable por workspace (`eph-*`) para probar crear y destruir; ver `docs/AMBIENTE_EFIMERO.md`.
-- `modules/`: guia de los modulos previstos; se agregaran al codificar recursos.
+- `modules/`: propuesta de modularización; las raíces actuales aún declaran sus recursos directamente.
 - `docs/INFRAESTRUCTURA_STAGING.md`: diagrama, recursos administrados, variables y salidas de staging.
 - `backend.hcl.example`: backend remoto para el estado de staging.
 - `.gitignore`: excluye estado, configuracion local y planes de Terraform.
@@ -23,7 +24,16 @@ administran todavia con Terraform; confirmar su alcance antes de incorporarlos.
   `us-east-1`.
 - Credenciales de MongoDB Atlas, solo cuando se administren recursos de Atlas: las
   lee el proveedor de `MONGODB_ATLAS_PUBLIC_API_KEY` y `MONGODB_ATLAS_PRIVATE_API_KEY`;
-  nunca guardarlas en `.tfvars`, el repositorio ni el estado. Hoy no se necesitan.
+  nunca guardarlas en `.tfvars` ni en el repositorio. Staging las requiere para el
+  plan conectado porque ya declara Atlas; formato, validación y pruebas mock no las requieren.
+  Tratar estado y planes como sensibles: pueden contener datos de los proveedores.
+
+## Operaciones con infraestructura
+
+Las secciones siguientes son procedimientos para una intervención autorizada.
+No ejecutar bootstrap, migración, importación, apply o destroy como parte de
+una revisión documental. Si el bucket o el estado ya existen, comprobar primero
+su ubicación y permisos; no repetir el aprovisionamiento.
 
 ## Crear el bucket de estado
 
@@ -53,7 +63,7 @@ terraform init -migrate-state -backend-config=backend.hcl
 Conservar el archivo `terraform.tfstate` temporal solo hasta confirmar que la
 migracion termino. No subirlo ni el plan binario al repositorio.
 
-## Importar ECR y logs de staging
+## Revisar las importaciones de staging
 
 Desde `environments/staging`, copiar el ejemplo de variables, configurar
 las credenciales Atlas mediante variables de entorno, y luego inicializar el backend:
@@ -65,9 +75,11 @@ terraform validate
 terraform plan -out staging.tfplan
 ```
 
-El primer plan contiene bloques `import` para los tres ECR y tres CloudWatch Log
-Groups documentados. Confirmar que importa esos seis recursos sin reemplazos,
-eliminaciones ni cambios inesperados antes de aplicar el plan guardado. No aplicar
+La raíz completa incluye las 51 importaciones descritas en
+[INFRAESTRUCTURA_STAGING.md](docs/INFRAESTRUCTURA_STAGING.md), incluidas Atlas, red,
+ECS, CloudFront y S3. No es un plan limitado a los seis recursos de ECR y logs.
+El número de importaciones pendientes depende del estado remoto. Revisar todas las
+acciones, cambios de outputs y drift antes de considerar aplicar el plan guardado. No aplicar
 si el plan intenta crear duplicados o modificar atributos no previstos.
 
 Los repositorios ECR se declaran con etiquetas **mutables**, que es como estan hoy en
@@ -82,7 +94,8 @@ del bootstrap usa `bootstrap/state.tfstate`, ambos en el mismo bucket.
 
 ## Red y ALB de staging (T024)
 
-`network.tf` y `alb.tf` describen lo que ya existe y lo **importan**; no crean ni destruyen red:
+`network.tf` y `alb.tf` declaran recursos para adoptar por importación; el plan
+real debe confirmar que no propone crear, reemplazar o destruir red:
 
 | Recurso | Cantidad | Importado por |
 |---|---|---|
@@ -92,10 +105,12 @@ del bootstrap usa `bootstrap/state.tfstate`, ambos en el mismo bucket.
 | Listeners HTTP (80, 8080, 8501) | 3 | ARN |
 
 La VPC predeterminada, sus subredes y la lista de prefijos de CloudFront solo se leen con `data` sources.
-Con estos bloques el primer `plan` suma 12 importaciones nuevas a las 6 de ECR y logs. Debe decir
-`will be imported` en todas y no proponer reemplazos (`-/+`) ni eliminaciones: `name` y `description` de un
+Estos bloques declaran 12 importaciones adicionales a las 6 de ECR y logs. Los
+recursos aún no incorporados al estado deben figurar como importaciones; detenerse
+si aparecen reemplazos (`-/+`) o eliminaciones: `name` y `description` de un
 grupo de seguridad no se pueden cambiar sin reemplazarlo, por eso replican exactamente lo que hay en AWS.
-Todos los recursos llevan `prevent_destroy`.
+Los recursos de estos dos archivos llevan `prevent_destroy`; esta guarda no impide
+cambios en sitio ni operaciones externas a Terraform.
 
 Dos cosas se importan **tal cual** y quedan anotadas como pendientes en el codigo (`#checkov:skip`):
 los listeners son HTTP (CloudFront publica el HTTPS y habla HTTP con el origen) y existe un grupo de seguridad
@@ -119,14 +134,15 @@ Cambiar cualquiera de las dos es una decision aparte, con su propio PR y plan.
 - Nunca declarar `aws_secretsmanager_secret_version` para estos secretos: el valor lo gestiona otro proceso y no
   debe pasar por el codigo ni por el estado. Son exactamente los 12 que lee la tarea de barber.
 - `spark` y `ollama` (servicios, secretos de spark, ECR y logs de ollama) quedan fuera de este alcance.
-- Con este PR el primer `plan` suma 16 importaciones (clúster, proveedores, 2 servicios y 12 secretos). Debe
-  decir `will be imported` en todas y no proponer reemplazos ni eliminaciones.
+- Estos archivos declaran 16 importaciones (clúster, proveedores, 2 servicios y 12 secretos).
+  Confirmar cuáles faltan en el estado y detenerse ante reemplazos o eliminaciones.
 
 
 ## CloudFront y S3 (T120)
 
-`cdn.tf` y `storage.tf` importan lo que ya sirve el trafico y guarda los archivos. Valores leidos de AWS en solo lectura
-(`cloudfront get-distribution-config` y `s3api get-*`) y replicados tal cual.
+`cdn.tf` y `storage.tf` declaran la adopción de distribuciones y buckets existentes.
+Los comentarios registran una lectura previa de AWS; esta revisión no la repite ni
+certifica que esos valores sigan coincidiendo con el entorno.
 
 | Recurso | Cantidad | Importado por |
 |---|---|---|
@@ -141,15 +157,15 @@ Cambiar cualquiera de las dos es una decision aparte, con su propio PR y plan.
   tiene todo bloqueado. No cambiar ninguno sin revisar el plan.
 - El bucket de respaldos de la Fase 5 (`urbanblade-backups-*`) queda fuera de este alcance.
 - Las etiquetas por defecto del proveedor (`Project`, `Environment`, `ManagedBy`) se agregan en sitio a los 5 recursos
-  que las admiten (3 distribuciones y 2 buckets); es el unico cambio esperado en el primer `plan`, ademas de las
-  12 importaciones nuevas (3 distribuciones, 2 buckets, 6 configuraciones de bucket y 1 politica). No debe proponer reemplazos ni eliminaciones.
+  que las admiten (3 distribuciones y 2 buckets); es un cambio en sitio que debe revisarse además de las
+  12 importaciones declaradas (3 distribuciones, 2 buckets, 6 configuraciones de bucket y 1 política). No debe proponer reemplazos ni eliminaciones.
 - Falta el `plan` real: depende del estado remoto (T115) y de credenciales con lectura de CloudFront y S3.
 
 
 ## MongoDB Atlas (T118)
 
-`atlas.tf` describe el clúster y los usuarios de base de datos para importarlos. **No se ha ejecutado ningun plan**:
-faltan datos que solo se ven en Atlas y las credenciales de su API.
+`atlas.tf` describe el clúster y los usuarios de base de datos para importarlos. **Esta revisión no ejecuta ni acredita un plan conectado**; su comprobación
+requiere los datos reales de Atlas y las credenciales de su API.
 
 | Recurso | Cantidad | Importado por |
 |---|---|---|
@@ -163,24 +179,30 @@ Datos que hay que dar (no estan en ningun archivo del repo; van en `terraform.tf
 
 - Todo lleva `prevent_destroy`. Si la region o el nivel no coinciden con Atlas, el plan debe **fallar**, no proponer
   reemplazar el clúster: en M0 no hay respaldo en la nube y reemplazar es perder los datos.
-- Los usuarios llevan `ignore_changes = [password]`. Nunca declarar contraseñas ni `*_wo`: viven en Secrets Manager y
-  en los `.env`, y no deben pasar por el codigo ni por el estado.
+- Los usuarios llevan `ignore_changes = [password]`. Las contraseñas se gestionan fuera de este código;
+  no declararlas aquí ni asumir que la guarda protege cualquier contenido del estado.
 - Fuera de alcance: el usuario personal `luis` (excepcion aceptada del propietario) y la lista de acceso de red de
   Atlas. De esta ultima hoy se desconoce el contenido; para incorporarla hay que leerla (`atlas accessLists list`) y
   anadir `mongodbatlas_project_ip_access_list` con sus entradas reales.
-- El primer `plan` debe mostrar solo `will be imported` en los 5 recursos, sin cambios. Cualquier `must be replaced`
+- Para adoptar los cinco recursos de Atlas, revisar importaciones pendientes y exigir ausencia de cambios. Cualquier `must be replaced`
   o `will be updated` significa que un valor declarado no coincide: corregir el codigo, nunca aplicar.
 
 
 ## Validacion local sin AWS
 
-Para comprobar sintaxis y formato sin credenciales ni backend remoto:
+Desde un checkout de revisión aislado, sin credenciales heredadas ni configuración
+local de backend; no reutilizar un directorio operativo ya inicializado.
+Las descargas de proveedores requieren red, pero no acceso a AWS/Atlas:
 
 ```powershell
-terraform -chdir=bootstrap/state init -backend=false
+terraform -chdir=bootstrap/state init -backend=false -input=false -lockfile=readonly
 terraform -chdir=bootstrap/state validate
-terraform -chdir=environments/staging init -backend=false
+terraform -chdir=environments/staging init -backend=false -input=false -lockfile=readonly
 terraform -chdir=environments/staging validate
+terraform -chdir=environments/ephemeral init -backend=false -input=false -lockfile=readonly
+terraform -chdir=environments/ephemeral validate
+terraform -chdir=environments/ephemeral test
+python -B -m unittest discover -s tests -v
 terraform fmt -check -recursive
 ```
 
@@ -199,12 +221,15 @@ Dos herramientas, ambas sin credenciales de AWS:
 tflint --init
 tflint --chdir=bootstrap/state --config="$PWD/.tflint.hcl"
 tflint --chdir=environments/staging --config="$PWD/.tflint.hcl"
+tflint --chdir=environments/ephemeral --config="$PWD/.tflint.hcl"
 
 # Seguridad (config en .checkov.yaml)
 checkov --config-file .checkov.yaml
 ```
 
-Las excepciones de checkov viven en el codigo, junto al recurso, como
+El [registro de excepciones](docs/EXCEPCIONES_CHECKOV.md) distingue compatibilidad,
+limitaciones de análisis y deuda pendiente. No equivale a una aceptación de riesgos.
+Las excepciones de Checkov viven en el código, junto al recurso, como
 `#checkov:skip=ID:motivo`. Revisarlas al cambiar el recurso: por ejemplo, las de ECR
 (`CKV_AWS_51` etiquetas mutables y `CKV_AWS_136` cifrado KMS) dependen de pasar a etiquetas por SHA y de
 poder recrear el repositorio. Los grupos de logs de staging retienen 90 dias; produccion debe retener mas.
@@ -224,11 +249,15 @@ repositorio.
 
 ## Pipeline (T043 a T046)
 
-`.github/workflows/terraform.yml` valida cada cambio y, cuando el repositorio tiene sus secretos, planea y aplica staging.
+`.github/workflows/terraform.yml` define validaciones para PR y push a main con rutas
+relevantes. El plan exige habilitación explícita; apply requiere además ejecución
+manual y sus protecciones. El workflow figuraba desactivado en la revisión del
+28-oct-2026: tener el YAML o los secretos no acredita una ejecución remota.
 
 | Paso | Cuándo corre | Qué hace |
 |---|---|---|
-| `formato` (T044) | cada PR y cada push a `main` | `terraform fmt -check -recursive` |
+| `pruebas-resumen` (T137/T138) | PR y push a main con rutas relevantes, si Actions está habilitado | 15 pruebas sin nube |
+| `formato` (T044) | mismos eventos y filtros | `terraform fmt -check -recursive` |
 | `validar` (T044) | igual | `init -backend=false` y `validate` en `bootstrap/state`, `environments/staging` y `environments/ephemeral`; en el efímero también `terraform test` |
 | `analisis` (T030) | igual | `tflint` y `checkov` con `.tflint.hcl` y `.checkov.yaml` |
 | `plan` (T138; referencia anterior T045) | push o ejecución manual desde main y `TERRAFORM_PLAN = true` | `terraform plan` de staging; el resumen del job lista cada recurso y su acción (sin atributos) |
@@ -239,12 +268,12 @@ Los PR se validan sin secretos, incluidos los del mismo repositorio. El plan con
 `fmt`, `validate`, `tflint`, `checkov` y `terraform test` no necesitan credenciales. `plan` y `aplicar` sí, y **nada de eso va en el código** (T043). Hay que crearlo una vez en GitHub, en *Settings*:
 
 1. **Secrets and variables > Actions > Secrets** (repositorio):
-   - `AWS_ROLE_ARN`: rol de IAM que GitHub asume por OIDC (confianza con `token.actions.githubusercontent.com`, limitada a este repo y a la rama `main`).
+   - `AWS_ROLE_ARN`: rol de IAM que GitHub asume por OIDC (confianza con `token.actions.githubusercontent.com`, con condición de confianza específica para cada job: rama main para plan y entorno staging-aprobacion para apply; no ampliar la confianza para resolver un rechazo).
    - `TF_BACKEND_HCL`: contenido del `backend.hcl` de staging (ver `backend.hcl.example`).
    - `TF_VAR_AWS_ACCOUNT_ID`, `TF_VAR_ATLAS_PROJECT_ID`, `TF_VAR_ATLAS_CLUSTER_NAME`: valores de las variables del mismo nombre.
    - `MONGODB_ATLAS_PUBLIC_API_KEY` y `MONGODB_ATLAS_PRIVATE_API_KEY`: llaves de API de Atlas.
 2. **Variables**: `TERRAFORM_PLAN = true`, para activar el job `plan`. Sin ella solo corren las validaciones.
-3. **Environments**: crear `staging-aprobacion` y agregar a una o más personas en *Required reviewers*. Sin esa regla el `apply` no esperaría aprobación.
+3. **Environments** (lo configura el propietario en este repositorio personal): crear `staging-aprobacion` y agregar a una o más personas en *Required reviewers*. Sin esa regla el `apply` no esperaría aprobación.
 
 El `apply` nunca es automático: se lanza con *Actions > Terraform > Run workflow*, desde `main`, marcando «aplicar»; el job queda en espera hasta que una persona revisora lo apruebe **solo si esa protección está configurada realmente**. En la revisión del 28-oct-2026 GitHub devolvió cero entornos: este requisito sigue pendiente y no debe asumirse por mencionar el nombre en YAML. Como el repositorio es público, los registros también lo son: el workflow no imprime el plan ni sube el archivo del plan como artefacto.
 
@@ -254,6 +283,13 @@ La guia [CI_TERRAFORM.md](docs/CI_TERRAFORM.md) detalla T137 y T138, los context
 que pueden usar credenciales, el resumen seguro del plan y las evidencias necesarias
 para cerrar las tareas. Los PR se validan sin secretos; el plan real requiere main
 y habilitacion explicita.
+
+## Documentación de referencia
+
+- [Arquitectura e inventario declarado](docs/INFRAESTRUCTURA_STAGING.md).
+- [Validación y plan del Sprint 4](docs/CI_TERRAFORM.md).
+- [Excepciones de Checkov y decisiones pendientes](docs/EXCEPCIONES_CHECKOV.md).
+- [Ambiente efímero](docs/AMBIENTE_EFIMERO.md).
 
 ## Políticas y licencia
 
