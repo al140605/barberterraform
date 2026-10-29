@@ -18,9 +18,8 @@ en un solo reporte. No publiques exploits, tokens o datos personales.
 
 Las correcciones se proponen por PR contra `main`.
 Identifica el SHA evaluado: una rama local, un resultado de CI y una versión
-aplicada a la infraestructura
-son evidencias diferentes. No se promete un plazo de respuesta, una recompensa
-o soporte por versión que el equipo no haya acordado.
+aplicada a la infraestructura son evidencias diferentes. No se promete un plazo de
+respuesta, una recompensa o soporte por versión que el equipo no haya acordado.
 
 El equipo revisará el reporte y coordinará la reproducción, mitigación y divulgación
 por el canal privado. Un reporte no autoriza pruebas sobre producción, acceso a
@@ -58,6 +57,12 @@ No reescribir Git, cambiar cuentas o desactivar controles de forma automática.
 Los escáneres y resultados de CI son controles complementarios; no certifican
 ausencia de vulnerabilidades. Los componentes de terceros conservan sus avisos y
 licencias; los hallazgos se evalúan por alcance e impacto.
+
+## Documentación técnica
+
+Consultar [CI y permisos](docs/CI_TERRAFORM.md), [protecciones de GitHub](docs/PROTECCIONES_GITHUB.md),
+[operación del estado](docs/OPERACION_TERRAFORM.md) y [excepciones de Checkov](docs/EXCEPCIONES_CHECKOV.md).
+Esas guías describen controles y pendientes; no sustituyen una evaluación del entorno.
 
 ## Otras políticas
 

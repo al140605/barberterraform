@@ -13,14 +13,15 @@ Se conservan las exclusiones inline y la configuración original; no se cambia i
 Una anotación puede expandirse por for_each a varias instancias. Una regla inline
 puede no producir un resultado en esta versión. Por eso 107 omisiones no son 107
 comentarios ni una medida de seguridad aprobada. Checkov no acredita controles de
-Atlas ni verifica el entorno remoto. El reporte JSON completo se conserva localmente;
-no se publica porque incluye bloques de código y metadatos de infraestructura.
+Atlas ni verifica el entorno remoto. El reporte JSON de aquella revisión se conservó localmente;
+no es un artefacto público del repositorio porque incluye código y metadatos.
+Para una nueva evaluación, generar evidencia propia con [PRUEBAS.md](PRUEBAS.md).
 
 ## Criterio de revisión
 
 Este registro documenta propuestas de clasificación, no aceptación del riesgo.
-El propietario y quienes mantengan infraestructura y aplicaciones deben acordar
-responsable, fecha de revisión y evidencia para cada cambio operativo; esas
+KikeGonRam coordina el acuerdo con quienes mantienen infraestructura y aplicaciones
+para definir responsable, fecha y evidencia por cambio operativo; esas
 asignaciones siguen pendientes. El acuerdo se coordina en [#14](https://github.com/al140605/barberterraform/issues/14)
 y las protecciones previas al plan en [#13](https://github.com/al140605/barberterraform/issues/13).
 Revisar antes del primer plan conectado y cada
@@ -151,3 +152,6 @@ Ninguna de estas propuestas autoriza una intervención en producción ni cambia 
 - [AWS: restringir acceso al ALB desde CloudFront](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/restrict-access-to-load-balancer.html).
 - [GitHub: OIDC con AWS y condición sub de un entorno](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws).
 - [Configuración de Checkov del proyecto](../.checkov.yaml).
+
+[Índice de documentación](README.md) · [Decisiones de arquitectura](DECISIONES_ARQUITECTURA.md) ·
+[Evidencias y alcance de la revisión](EVIDENCIAS.md).

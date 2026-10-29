@@ -1,6 +1,7 @@
 # Protecciones de GitHub y responsabilidades
 
-Repositorio: al140605/barberterraform. Revisión: 28-oct-2026.
+Repositorio: al140605/barberterraform. Revisión documental: 29-oct-2026.
+Consulta [EVIDENCIAS.md](EVIDENCIAS.md) para fechas y alcance de los resultados.
 
 ## Estado comprobado
 
@@ -14,8 +15,8 @@ El workflow está habilitado. TERRAFORM_PLAN=false y TERRAFORM_APPLY=false manti
 las operaciones conectadas desactivadas. Los PR a main ejecutan todos los controles
 sin filtros de rutas, igual que los push a main. La validación se separa de
 terraform-plan.yml y terraform-apply.yml, ambos manuales y bloqueados.
-El bloqueo independiente de apply ya se incorporó en el PR #15; su separación
-en workflows estará vigente cuando se fusione el nuevo cambio.
+El bloqueo independiente se incorporó en el PR #15 y los workflows separados
+en el PR #16; ambos están fusionados. Esto no instala protecciones administrativas.
 
 ## Reglas preparadas para main
 
@@ -85,3 +86,5 @@ habilitadas expresamente y autorización específica; este mantenimiento no la c
 - [Coordinación de excepciones #14](https://github.com/al140605/barberterraform/issues/14).
 - [GitHub: entornos](https://docs.github.com/en/rest/deployments/environments).
 - [GitHub: checks obligatorios y filtros](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks).
+
+[Índice de documentación](README.md) · [CI y permisos de cada workflow](CI_TERRAFORM.md).
