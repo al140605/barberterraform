@@ -12,8 +12,10 @@ el acceso insuficiente también puede ocultarlas. La lista de rulesets fue vací
 
 El workflow está habilitado. TERRAFORM_PLAN=false y TERRAFORM_APPLY=false mantienen
 las operaciones conectadas desactivadas. Los PR a main ejecutan todos los controles
-sin filtros de rutas; los push conservan sus filtros. El bloqueo de apply en YAML
-solo estará vigente en main después de fusionar este cambio.
+sin filtros de rutas, igual que los push a main. La validación se separa de
+terraform-plan.yml y terraform-apply.yml, ambos manuales y bloqueados.
+El bloqueo independiente de apply ya se incorporó en el PR #15; su separación
+en workflows estará vigente cuando se fusione el nuevo cambio.
 
 ## Reglas preparadas para main
 
@@ -72,8 +74,8 @@ Los payloads son una propuesta versionada; su presencia no prueba aplicación.
 | Acordar responsables y fechas por excepción | Luis / KikeGonRam | Seguimiento en #14; no reasigna historias del backlog. |
 | Revisión independiente y autorización de operaciones | Persona distinta de quien solicita el cambio | Debe quedar registrada antes de fusionar/aplicar según corresponda. |
 
-No se configuraron credenciales ni confianza IAM/OIDC. Antes de habilitar plan,
-revisar identidad AWS, subject OIDC real, permisos de lectura y bloqueo del backend.
+No se configuraron credenciales ni confianza IAM/OIDC. Antes de habilitar plan, configurar AWS_PLAN_ROLE_ARN y AWS_APPLY_ROLE_ARN
+como roles separados y revisar identidad AWS, subject OIDC real, permisos de lectura y bloqueo del backend.
 Apply requiere revisión operativa propia, protecciones aplicadas, ambas variables
 habilitadas expresamente y autorización específica; este mantenimiento no la concede.
 

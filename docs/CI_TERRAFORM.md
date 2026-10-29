@@ -1,7 +1,8 @@
 # Pipeline Terraform · T137 y T138
 
 Sprint 4: 26 de octubre a 6 de noviembre de 2026.
-Fuente de implementación: [.github/workflows/terraform.yml](../.github/workflows/terraform.yml).
+Fuentes: [validación](../.github/workflows/terraform.yml),
+[plan](../.github/workflows/terraform-plan.yml) y [apply](../.github/workflows/terraform-apply.yml).
 
 | Tarea | Responsable según el backlog | Alcance |
 | --- | --- | --- |
@@ -15,18 +16,19 @@ Los estados del Excel se actualizan únicamente con evidencia del entorno corres
 
 | Contexto | Sin credenciales | Plan con credenciales | Apply |
 | --- | --- | --- | --- |
-| Todo PR hacia main | Formato, validate, tflint, Checkov y pruebas del resumen. | No, aunque el PR proceda del mismo repositorio. | No. |
-| Push de infraestructura/pipeline revisado a main | Mismos controles. | Solo con TERRAFORM_PLAN=true y configuración completa. | No. |
-| Ejecución manual desde main | Mismos controles. | Mismas condiciones. | Exige TERRAFORM_APPLY=true, marcar aplicar y el entorno staging-aprobacion. |
-| Rama diferente de main | La validación depende del evento de PR. | No. | No. |
+| Todo PR o push hacia main | Seis controles de validación. | Nunca. | Nunca. |
+| Terraform Validacion manual o reutilizable | Mismos controles. | Nunca. | Nunca. |
+| Terraform Plan manual desde main | Revalida antes del job conectado. | Solo TERRAFORM_PLAN=true. | Nunca. |
+| Terraform Apply manual desde main | Revalida antes del job conectado. | Genera su propio plan local si se habilita la ejecución. | Ambas variables=true, confirmación APLICAR staging y entorno protegido. |
+| Rama diferente de main | Validación mediante PR o despacho manual. | No. | No. |
 
-Los PR son una superficie de código todavía no revisado: no reciben secretos del plan.
-El plan remoto se ejecuta sobre main después de revisar el cambio.
-Si se necesita un plan previo a fusionar, debe diseñarse un flujo protegido y de mínimo
-privilegio; no basta con comprobar que el PR pertenezca al mismo repositorio.
+No se usa workflow_run, pull_request_target ni secrets:inherit. Los flujos
+conectados tienen únicamente workflow_dispatch; el código sin revisar de un PR
+no puede iniciar trabajos con credenciales desde estos workflows.
 
-El apply existente corresponde a un alcance operativo distinto. La presencia de un
-environment en YAML no prueba que sus revisores estén configurados en GitHub.
+La presencia de un environment en YAML no prueba que sus revisores estén
+configurados. Las protecciones administrativas continúan pendientes del propietario.
+Plan y apply no se han ejecutado contra AWS/Atlas durante esta mejora.
 
 ## T137: validación aislada
 
@@ -48,10 +50,10 @@ No se añaden exclusiones para ocultar hallazgos.
 
 ## T138: plan real y publicación del resultado
 
-El job solo puede ejecutarse desde main, tras superar los controles previos y con
+El workflow de plan se despacha manualmente desde main, revalida y solo ejecuta su job conectado con
 TERRAFORM_PLAN=true. Apply exige además TERRAFORM_APPLY=true. Requiere los nombres siguientes; no se documentan valores:
 
-- AWS_ROLE_ARN y TF_BACKEND_HCL.
+- AWS_PLAN_ROLE_ARN para plan, AWS_APPLY_ROLE_ARN para apply y TF_BACKEND_HCL.
 - TF_VAR_AWS_ACCOUNT_ID, TF_VAR_ATLAS_PROJECT_ID y TF_VAR_ATLAS_CLUSTER_NAME.
 - MONGODB_ATLAS_PUBLIC_API_KEY y MONGODB_ATLAS_PRIVATE_API_KEY.
 
@@ -97,11 +99,14 @@ Un resumen no sustituye la revisión privada del plan cuando sea necesaria.
 Desde la raíz del repositorio:
 
 ```powershell
+python -m pip install -r .github/requirements-tests.txt
 python -B -m unittest discover -s tests -v
 terraform fmt -check -recursive
 ```
 
-La suite del resumen usa JSON sintético y no requiere proveedores ni credenciales.
+La suite del resumen usa JSON sintético. Las políticas usan PyYAML fijado en
+requirements-tests.txt. Los tests del runner Bash usan Terraform ficticio y solo
+se ejecutan en Linux; en Windows quedan omitidos. Ninguna suite necesita nube.
 Para validate y terraform test, inicializar un directorio de datos local aislado con
 backend desactivado y los proveedores de las versiones del lockfile. No reutilizar
 la configuración o estado de un directorio operativo.
@@ -197,3 +202,39 @@ verificación para resolver un fallo. Referencia: [providers lock](https://devel
 
 Las reglas preparadas, permisos comprobados y responsables de coordinación están en
 [PROTECCIONES_GITHUB.md](PROTECCIONES_GITHUB.md). Su aplicación administrativa sigue pendiente.
+
+## Separación de flujos y dependencias (29-oct-2026)
+
+terraform.yml conserva los nombres de los seis checks y se puede llamar sin secretos.
+Los flujos manuales reutilizan esa validación con contents:read explícito; solo
+su job de operación recibe id-token:write y secretos. Los roles plan/apply tienen
+nombres de secreto separados para evitar reutilizar accidentalmente el rol de escritura
+al revisar un plan. Los permisos IAM reales aún deben configurarse y comprobarse.
+
+La aprobación del entorno ocurre antes de generar el plan de apply. Ese job aplica
+exactamente el plan que acaba de generar; no reutiliza el plan de otro workflow y
+no demuestra una revisión humana previa de ese binario. Esta limitación exige
+acordar la revisión privada antes de habilitar TERRAFORM_APPLY.
+
+scripts/terraform_operation.sh centraliza init, plan, resumen y apply opcional.
+mktemp y umask 077 aíslan los archivos; un trap los limpia en éxitos y errores.
+La terminación abrupta del runner no garantiza ejecutar el trap: se usan runners
+hospedados efímeros y no se publican los archivos. No usar runners persistentes
+sin diseñar su limpieza y aislamiento.
+
+Las Actions se fijan a SHA de releases oficiales verificadas, incluidos sus
+entrypoints compilados. setup-terraform 4.0.1, setup-tflint 6.3.2 y
+configure-aws-credentials 6.3.0 reemplazan majors anteriores; checkout 7.0.1 y
+setup-python 7.1.0 se fijan también por SHA. Sus entradas utilizadas se contrastaron
+con action.yml oficial. La autenticación real de AWS no se prueba con mocks.
+
+Dependabot revisa github-actions y pip en /.github semanalmente, con máximo tres
+PR abiertos por ecosistema y sin automerge. Las versiones y dependencias transitivas
+se revisan con sus PR; los manifiestos fijan dependencias directas, no constituyen
+un lock completo con hashes de todo el entorno Python. Una actualización no autoriza nube.
+
+No se versionan credenciales, no se actualizan recursos/proveedores, no se cambian
+exclusiones Checkov y las dos variables operativas siguen en false.
+
+Fuentes: [reutilizar workflows](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows),
+[Dependabot para Actions](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-on-actions).
