@@ -103,7 +103,7 @@ Los comandos de prueba no autorizan un plan conectado, import, apply o destroy.
 
 ## Evidencia y pendientes operativos
 
-Revisión del 28 de octubre de 2026:
+Estado inicial observado el 28 de octubre de 2026 (antes de habilitar validaciones):
 
 - El workflow remoto figura disabled_manually.
 - GitHub devolvió cero secretos de Actions y cero variables del repositorio.
@@ -112,6 +112,27 @@ Revisión del 28 de octubre de 2026:
   El propietario debe establecerlos antes de considerar cualquier apply.
 - Las validaciones locales no demuestran que un plan real pueda leer AWS/Atlas
   ni que la infraestructura ya esté importada en el estado.
+
+### Activación de validación sin nube
+
+El 28-oct-2026 se habilitó el workflow y se fijó TERRAFORM_PLAN=false.
+La primera [ejecución remota](https://github.com/al140605/barberterraform/actions/runs/40808978959)
+aprobó formato, las 15 pruebas del resumen y tflint/Checkov; validate falló por
+checksums de paquetes Linux ausentes en los lockfiles. Plan y apply se omitieron.
+Los lockfiles se generaron con providers lock para Linux y Windows en la
+[ejecución de diagnóstico](https://github.com/al140605/barberterraform/actions/runs/40809985048),
+que aprobó los seis jobs de validación y omitió plan/apply. Se copiaron únicamente
+los lockfiles y se comprobó que conservan versiones, constraints y hashes anteriores.
+La rama de diagnóstico no forma parte de los PR ni debe fusionarse.
+La corrección incorpora hashes de Linux sin actualizar las versiones de proveedores
+ni retirar lockfile=readonly. Un resultado fallido permanece como evidencia;
+la corrección debe comprobarse en una nueva ejecución del SHA actualizado.
+
+No configurar secretos ni cambiar TERRAFORM_PLAN durante este mantenimiento.
+El seguimiento de protecciones y permisos está en [#13](https://github.com/al140605/barberterraform/issues/13)
+y el acuerdo de responsables de excepciones en [#14](https://github.com/al140605/barberterraform/issues/14).
+Sus asignaciones al propietario son de coordinación; los responsables técnicos y
+fechas de ejecución aún requieren acuerdo del equipo.
 
 Por tanto, T137 y T138 no se declaran cerradas solo por editar YAML.
 La activación y ejecución remota del plan requieren su revisión operativa.
@@ -149,3 +170,15 @@ La existencia del código no acredita importaciones aplicadas ni funcionamiento 
 [Terraform plan](https://developer.hashicorp.com/terraform/cli/commands/plan) ·
 [Mocks de proveedores](https://developer.hashicorp.com/terraform/language/tests/mocking) ·
 [OIDC en AWS con GitHub Actions](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws).
+
+## Mantenimiento de checksums multiplataforma
+
+Conservar las versiones del lockfile al añadir una plataforma. Desde cada raíz,
+terraform providers lock -platform=linux_amd64 -platform=windows_amd64 obtiene
+paquetes y checksums oficiales sin inicializar el backend ni leer AWS/Atlas.
+Revisar que el diff solo agregue hashes y que no cambie version ni constraints.
+Si se usa un mirror local, verificar primero los ZIP contra los zh ya registrados;
+los hashes del mirror por sí solos no acreditan procedencia oficial.
+
+No editar hashes a mano, borrar el lockfile, usar init -upgrade ni desactivar su
+verificación para resolver un fallo. Referencia: [providers lock](https://developer.hashicorp.com/terraform/cli/commands/providers/lock).

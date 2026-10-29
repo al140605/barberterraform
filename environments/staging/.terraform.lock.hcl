@@ -5,6 +5,7 @@ provider "registry.terraform.io/hashicorp/aws" {
   version     = "6.66.0"
   constraints = "~> 6.0"
   hashes = [
+    "h1:hBEaeBm9nm7A/u1nnD0nfolTPP55/BoKRFWk8zG8/fk=",
     "h1:xehZnyesOrJ1/R9tmnRSu7FRkwoDDKelEHI3WdnJ72g=",
     "zh:156fe7164a3d26ef6b35734c43e99fb198df90575ed897d1182b8e930b8cd523",
     "zh:1af52b22b35be00f8d16e3ebebff9fa699ec4db2ef69e6032ba5c536f80c03d9",
@@ -29,6 +30,7 @@ provider "registry.terraform.io/mongodb/mongodbatlas" {
   version     = "2.18.0"
   constraints = "~> 2.0"
   hashes = [
+    "h1:5SbBLSo0vQJDigUcVwc/cSsq6excpXw4uIRXQphCSc0=",
     "h1:9QY4ISyTCrevoK1AIdvRBt7XPVARDd82b9oVhUCHHF4=",
     "zh:01d1aeeefb223e0356a8f5cbe41a59da04605d116802a836c4823568af6f343e",
     "zh:16dab8d1b817a175197c39f635bf2e5968e1e64afe3c0c3d68e7e6483c44c169",
