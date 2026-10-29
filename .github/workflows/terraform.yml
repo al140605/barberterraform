@@ -101,8 +101,18 @@ jobs:
       - name: terraform init y validate
         working-directory: ${{ matrix.dir }}
         run: |
+          terraform providers lock -platform=linux_amd64 -platform=windows_amd64
           terraform init -backend=false -input=false -lockfile=readonly
           terraform validate
+
+      - name: Guardar solo lockfile verificado para diagnóstico
+        uses: actions/upload-artifact@v4
+        with:
+          name: lockfile-${{ strategy.job-index }}
+          path: ${{ matrix.dir }}/.terraform.lock.hcl
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Pruebas de Terraform (guarda del ambiente efímero)
         if: matrix.dir == 'environments/ephemeral'
