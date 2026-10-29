@@ -1,69 +1,107 @@
-# Ambiente efímero de prueba (T032)
+# Ambiente efímero de prueba
 
-Un ambiente **desechable** para comprobar el ciclo completo *crear → verificar → destruir* con Terraform sin tocar
-staging. Vive en `environments/ephemeral/` y cada ambiente es un **workspace** de Terraform.
+Raíz: [environments/ephemeral](../environments/ephemeral). Permite comprobar un ciclo
+crear → verificar → retirar sobre recursos desechables, con nombres y estado separados
+de staging. El procedimiento conectado exige autorización para creación **y retirada**.
+La prueba mock de CI no requiere ninguna de esas operaciones.
 
-## Por qué existe una raíz aparte
+## Alcance y aislamiento
 
-`environments/staging` describe recursos reales con nombres fijos (`urbanblade-staging`, `urbanblade/barber`, ...) y
-todos llevan `prevent_destroy`. Reutilizarlo para un ambiente de prueba chocaría con esos nombres y `terraform destroy`
-fallaría. Por eso el efímero:
+El nombre proviene del workspace y debe cumplir `^eph-[a-z0-9][a-z0-9-]{1,18}$`.
+La guarda `terraform_data.guard` rechaza `default` y los nombres incompatibles;
+todos los recursos creados dependen de ella. Esto no evita lecturas de data sources
+ni sustituye comprobar cuenta, backend y permisos.
 
-- toma su nombre del workspace, que **debe empezar por `eph-`** (`eph-t032`); con `default` o cualquier otro nombre no
-  se crea nada (guarda `terraform_data.guard`, de la que dependen todos los recursos);
-- no usa `prevent_destroy` y el ECR lleva `force_delete`, de modo que `destroy` pueda borrarlo todo;
-- guarda su estado en `env:/<workspace>/ephemeral/terraform.tfstate` del bucket de estado, sin mezclarse con staging;
-- no incluye ALB, NAT ni secretos (cuestan dinero o se retienen al borrarse).
-
-## Qué crea (4 recursos, sin costo mientras no corran tareas)
-
-| Recurso | Nombre |
+| Recurso por defecto | Configuración |
 | --- | --- |
-| `terraform_data.guard` | validación del workspace (local, no existe en AWS) |
-| `aws_ecr_repository.ephemeral` | `urbanblade-ephemeral/<workspace>` (inmutable, con escaneo, cifrado KMS) |
-| `aws_cloudwatch_log_group.ephemeral` | `/ecs/urbanblade-<workspace>/app` (7 días) |
-| `aws_ecs_cluster.ephemeral` | `urbanblade-<workspace>` (sin servicios ni tareas) |
+| `terraform_data.guard` | Guarda local del workspace; no es un recurso AWS. |
+| ECR | `urbanblade-ephemeral/<workspace>`, inmutable, escaneo, cifrado KMS y `force_delete=true`. |
+| CloudWatch Log Group | `/ecs/urbanblade-<workspace>/app`, retención de siete días. |
+| Clúster ECS | `urbanblade-<workspace>`, sin servicios ni tareas. |
 
-Opcional, con `create_security_group = true`: `aws_security_group.ephemeral` (`urbanblade-<workspace>-tasks`, sin
-entrada). **Requiere el permiso `ec2:CreateTags`**, porque `default_tags` etiqueta el grupo; el usuario `staging-deploy`
-no lo tiene y la creación falla con `403 UnauthorizedOperation` (ver "Resultado de la ejecución"). Por eso es `false`
-por defecto.
+Por defecto hay **cuatro recursos Terraform**, tres de ellos AWS.
+`create_security_group=true` añade un quinto: grupo sin entrada y con salida HTTPS.
+La configuración consulta la VPC predeterminada; incluso sin crear el grupo necesita
+permisos de lectura de datos de red.
 
-Todo lleva las etiquetas `Environment=<workspace>`, `Ephemeral=true` y `ManagedBy=Terraform`.
+Las etiquetas AWS incluyen `Project`, `Environment=<workspace>`, `Ephemeral=true` y
+`ManagedBy=Terraform`. No se incluyen ALB, NAT, secretos ni una aplicación desplegada.
+No se presupone costo cero: revisar presupuesto, almacenamiento, imágenes y consumo
+antes de crear o prolongar un entorno. ECR puede eliminar imágenes al retirarlo.
 
-## Procedimiento
+## Prueba sin credenciales
 
-Requiere credenciales AWS de la cuenta `209479293733`. **`apply` y `destroy` solo con la orden explícita del
-propietario y el plan revisado.** Desde la raíz del repositorio (PowerShell):
+Seguir [PRUEBAS.md](PRUEBAS.md) para inicializar sin backend y ejecutar la prueba
+mock desde un checkout de revisión con workspace `default`. Esta prueba verifica
+la guarda; no crea recursos ni certifica el ciclo de vida en AWS.
+
+## Preparación para un ciclo conectado
+
+1. Registrar responsable, cuenta, nombre único `eph-*`, backend, presupuesto y
+   autorización explícita para crear y retirar sus recursos.
+2. Usar un checkout operativo dedicado y comprobar identidad AWS, región y permisos.
+   No reutilizar estado o directorios de staging.
+3. Revisar el backend real. No asumir que el bucket existe o falta por una nota
+   antigua; comprobarlo con acceso autorizado.
+4. Mantener `create_security_group=false` salvo que se haya autorizado el quinto
+   recurso y sus permisos, incluido `ec2:CreateTags`.
+
+Los antecedentes de permisos del 16-oct-2026 están en [EVIDENCIAS.md](EVIDENCIAS.md).
+No prueban que la identidad actual tenga las mismas restricciones.
+
+Desde `environments/ephemeral`, sin archivos locales previos que se vayan a sobrescribir:
 
 ```powershell
-cd environments/ephemeral
 Copy-Item terraform.tfvars.example terraform.tfvars
-```
-
-**Estado.** El diseño usa el bucket de estado (`backend.hcl.example`), pero ese bucket lo crea `bootstrap/state` y a
-la fecha **aún no existe** en la cuenta. Mientras no se aplique el bootstrap, usar estado local con un archivo de
-sustitución que git ignora (`*_override.tf`):
-
-```powershell
-Set-Content backend_override.tf 'terraform { backend "local" {} }'
-terraform init
-```
-
-Con el bucket ya creado: `Copy-Item backend.hcl.example backend.hcl` (poner el ID de cuenta) y
-`terraform init -backend-config=backend.hcl`.
-
-```powershell
+Copy-Item backend.hcl.example backend.hcl
+# Revisar variables y bucket; la clave debe seguir siendo ephemeral/terraform.tfstate.
+terraform init -input=false -lockfile=readonly -backend-config=backend.hcl
 terraform workspace new eph-t032
+terraform workspace show
+```
 
-# 1) Plan: debe decir "Plan: 4 to add, 0 to change, 0 to destroy" con nombres que contengan eph-t032.
-terraform plan -out eph.tfplan
-# 2) Crear (aplica el plan guardado, nunca apply a ciegas)
+Usar un nombre de prueba único si `eph-t032` ya existe; no seleccionar un workspace
+ajeno ni asumir que está vacío. En S3, un workspace no default usa por defecto
+`env:/<workspace>/ephemeral/terraform.tfstate`.
+
+### Alternativa local, solo cuando esté acordada
+
+Para un ensayo nuevo, sin estado previo ni backend inicializado, se puede acordar
+un backend local mediante un override ignorado por Git. Confirmar que el archivo
+no existe antes de crearlo:
+
+```powershell
+Set-Content -LiteralPath backend_override.tf -Value 'terraform { backend "local" {} }'
+terraform init -input=false -lockfile=readonly
+terraform workspace new eph-t032
+```
+
+Con backend local, los estados de workspaces no default viven en
+`terraform.tfstate.d/<workspace>/terraform.tfstate`. No moverlos a S3 ni cambiar el
+backend de un entorno existente como parte de este procedimiento. Su custodia y
+recuperación se acuerdan antes de crear recursos.
+
+## Plan y creación autorizada
+
+```powershell
+terraform plan -out=eph.tfplan
+```
+
+Por defecto se esperan cuatro altas Terraform y ninguna modificación/eliminación.
+Con el grupo opcional aprobado se esperan cinco. Revisar nombres, cuenta, workspace,
+etiquetas y ausencia de recursos de staging. Si el estado ya contiene recursos,
+el plan puede ser distinto: investigar y detenerse antes de asumir que es un ensayo nuevo.
+
+Tras revisar el plan y confirmar autorización para ese ciclo:
+
+```powershell
 terraform apply eph.tfplan
 terraform output
 ```
 
-### Verificar que existe (solo lectura)
+## Verificación de solo lectura
+
+Los nombres siguientes corresponden al ejemplo `eph-t032`:
 
 ```powershell
 aws ecr describe-repositories --repository-names urbanblade-ephemeral/eph-t032 --region us-east-1
@@ -71,55 +109,56 @@ aws ecs describe-clusters --clusters urbanblade-eph-t032 --region us-east-1 --qu
 aws logs describe-log-groups --log-group-name-prefix /ecs/urbanblade-eph-t032/ --region us-east-1
 ```
 
-En Git Bash exportar antes `MSYS_NO_PATHCONV=1`; si no, reescribe `/ecs/...` como una ruta de Windows y AWS rechaza el
-prefijo. En PowerShell no hace falta.
+En Git Bash usar `MSYS_NO_PATHCONV=1` para que no se reescriban rutas como `/ecs/...`.
+PowerShell no necesita esa variable. Depurar outputs antes de compartir evidencia.
 
-### Destruir y comprobar que no queda nada
+## Retirada autorizada y comprobación
+
+Confirmar de nuevo backend, cuenta y workspace. Esta sección solo retira recursos
+del entorno efímero acordado; nunca usarla sobre staging o bootstrap.
 
 ```powershell
-# 3) El plan de destrucción debe decir "0 to add, 0 to change, 4 to destroy" y solo mencionar recursos eph-t032.
-terraform plan -destroy -out eph-destroy.tfplan
-terraform apply eph-destroy.tfplan
-
-# 4) Verificación (ver nota sobre ECS):
-aws ecr describe-repositories --repository-names urbanblade-ephemeral/eph-t032 --region us-east-1   # RepositoryNotFoundException
-aws logs describe-log-groups --log-group-name-prefix /ecs/urbanblade-eph-t032/ --region us-east-1    # lista vacía
-aws ecs describe-clusters --clusters urbanblade-eph-t032 --region us-east-1 --query 'clusters[0].status'  # INACTIVE
-terraform state list                                                                                  # solo data sources
-
-# 5) Limpiar el workspace y los archivos locales
-terraform workspace select default
-terraform workspace delete eph-t032
-Remove-Item eph.tfplan, eph-destroy.tfplan, backend_override.tf
+terraform plan -destroy -out=eph-destroy.tfplan
 ```
 
-**Nota sobre ECS:** AWS conserva un tiempo los clústeres borrados con estado `INACTIVE`, y por eso el barrido por
-etiqueta (`aws resourcegroupstaggingapi get-resources --tag-filters Key=Environment,Values=eph-t032`) sigue
-listándolo. No es un resto: no cobra ni se puede usar, y un clúster nuevo con el mismo nombre se puede crear.
+Revisar el plan completo: solo los recursos del workspace propio y el número
+correspondiente al estado real. Con los cuatro recursos por defecto se esperan
+cuatro retiradas, incluida la guarda local. ECR puede contener imágenes que
+`force_delete` eliminará; confirmar que ninguna debe conservarse.
 
-## Criterio de aceptación de T032
+```powershell
+terraform apply eph-destroy.tfplan
+terraform state list
+aws ecr describe-repositories --repository-names urbanblade-ephemeral/eph-t032 --region us-east-1
+aws logs describe-log-groups --log-group-name-prefix /ecs/urbanblade-eph-t032/ --region us-east-1
+aws ecs describe-clusters --clusters urbanblade-eph-t032 --region us-east-1 --query 'clusters[0].status'
+```
 
-1. El plan inicial crea **exactamente 4** recursos, con nombres `eph-t032`, y no toca nada existente.
-2. `destroy` elimina exactamente esos 4 recursos; ECR y logs desaparecen, ECS queda `INACTIVE` y el estado queda vacío.
-3. Con el workspace `default` el plan **falla** con el mensaje de la guarda. Se comprueba con `terraform plan` real y,
-   sin credenciales de AWS, con `terraform -chdir=environments/ephemeral test` (proveedor simulado). La prueba solo es
-   válida con el workspace `default` seleccionado.
-4. Staging no cambia: este ambiente tiene su propia raíz y su propio estado.
+Comprobar ausencia de recursos administrados en el estado y de ECR/logs en AWS.
+Pueden quedar data sources; no equivalen a recursos pendientes de destrucción.
+ECS puede conservar temporalmente un registro `INACTIVE`: contrastarlo con la
+respuesta y fallos del servicio, no interpretar por sí sola una etiqueta o nombre
+como recurso operativo. Si se creó el grupo opcional, verificar también su retirada.
 
-## Resultado de la ejecución (2026-10-16)
+Solo después de verificar la limpieza y conservar evidencia depurada:
 
-| Intento | Resultado |
-| --- | --- |
-| 1 (con grupo de seguridad) | `apply` creó 4 de 5. El grupo de seguridad falló con `403`: `staging-deploy` no tiene `ec2:CreateTags`. Se destruyó lo creado y se comprobó que no quedaban restos. |
-| 2 (`create_security_group = false`) | Plan `4 to add`; `apply` creó los 4 y se verificó en AWS (ECR inmutable con escaneo y KMS, clúster `ACTIVE` sin servicios ni tareas, logs a 7 días). Plan de destrucción `4 to destroy`; ECR y logs desaparecieron, el clúster quedó `INACTIVE` y `terraform state list` quedó vacío. |
-| Guarda | `terraform plan` en `default` falló con el mensaje de la guarda; `terraform test` pasa. |
+```powershell
+terraform workspace select default
+terraform workspace delete eph-t032
+```
 
-**Consecuencia probable para staging (no probada):** `default_tags` etiqueta todo. Al importar los grupos de seguridad
-(T024) el primer plan propondrá actualizar sus etiquetas, y con `staging-deploy` esa actualización muy probablemente
-fallaría por la misma falta de `ec2:CreateTags` (y quizá permisos de etiquetado equivalentes en el ALB). Conviene
-revisarlo en el `plan` real antes de aplicar T024: conceder el permiso o importar esos recursos sin `default_tags`.
+Retirar únicamente planes y override de este ensayo cuando su conservación ya no
+sea necesaria, sin borrar estado o backups de otros workspaces. Si hubo un fallo
+parcial, conservar el estado y revisar los recursos antes de repetir operaciones.
+No forzar la eliminación del workspace para esconder recursos pendientes.
 
-## Qué no hace
+## Criterios de aceptación
 
-No prueba ECS con servicios, ALB ni secretos. Si más adelante se quiere un ambiente efímero con aplicación completa,
-conviene extraer módulos a `modules/` y reutilizarlos desde staging y desde este ambiente.
+- Creación limitada al workspace acordado, con cuatro recursos por defecto o cinco
+  si el grupo opcional se autorizó; sin cambios en staging.
+- Identidad, backend y plan revisados; verificación real de los recursos previstos.
+- Retirada y comprobación de estado y AWS, con evidencia de errores si los hubo.
+- Guarda rechaza `default` en prueba mock y no se confunde con creación real exitosa.
+
+El historial previo se conserva en [EVIDENCIAS.md](EVIDENCIAS.md). No acredita una
+nueva ejecución ni autorización para repetirla.

@@ -1,41 +1,55 @@
-# Cómo contribuir
+# Contribuir a Terraform de UrbanBlade
 
-## Preparar un cambio
+Los cambios se preparan en una rama y se revisan por PR hacia `main`. Antes de
+empezar, consultar [README](README.md), [documentación](docs/README.md),
+[seguridad](SECURITY.md) y el estado de Git. Conservar trabajo ajeno y separar cambios
+que tengan alcances o riesgos distintos.
 
-1. Revisar README, políticas y estado de Git; preservar trabajo ajeno.
-2. Crear una rama específica desde la referencia main revisada. No mezclar
-   implementación, infraestructura y documentación sin una razón concreta.
-3. Registrar qué cambia, por qué y cómo comprobarlo.
-4. Añadir al commit solo las rutas revisadas y comprobar el diff.
-5. Publicar por PR cuando el propietario lo autorice, con título y descripción
-   en español y evidencia correspondiente al commit actual.
+## Preparar un PR
 
-Conservar la autoría humana configurada. No añadir atribuciones de herramientas
-en commits o PR. No usar push forzado ni reescribir historial publicado.
+1. Partir de una referencia `main` actualizada y crear una rama específica.
+2. Revisar el código, los lockfiles y las guías afectadas. No incorporar estados,
+   planes, archivos locales de backend ni credenciales.
+3. Comprobar el diff y añadir únicamente rutas revisadas; no usar staging global
+   en un árbol con cambios de otras tareas.
+4. Crear un commit con autoría humana configurada, sin atribuciones de herramientas.
+5. Publicar cuando exista autorización, con título y descripción en español que
+   expliquen problema, cambio, evidencia y pendientes.
+6. Revisar los seis checks del SHA exacto y la revisión independiente que corresponda.
+   No forzar merge ni saltar protecciones; una política preparada no prueba que esté aplicada.
 
-## Validación
+No usar push forzado, reescribir historial publicado o eliminar ramas de otras tareas.
+No confundir publicación, CI, fusión y aplicación de infraestructura.
 
-Para Markdown, comprobar enlaces locales, conflictos y formato del diff.
-No ejecutar operaciones de Terraform ni acceder a AWS/Atlas para validar documentos.
-Si cambia infraestructura, seguir los controles del README y registrar el plan,
-el entorno y sus efectos. Un análisis estático no autoriza un apply.
+## Evidencia según el cambio
 
-No declarar CI verde antes de comprobar los checks del SHA revisado.
-Distinguir validación local, CI, fusión y aplicación del plan.
+| Cambio | Validación pertinente |
+| --- | --- |
+| Markdown | Enlaces y anclas locales, ejemplos contrastados con código, formato, conflictos y revisión de secretos. No ejecutar nube para comprobar texto. |
+| Workflows o scripts | Pruebas de políticas/runner, sintaxis y CI sobre el SHA nuevo; verificar que PR sigue sin secretos. |
+| Recursos Terraform | Formato, validate, análisis y pruebas pertinentes; plan conectado solo con autorización del entorno. |
+| Lockfiles/dependencias | Procedencia, versiones/checksums, compatibilidad, diff y CI; no borrar controles para obtener verde. |
 
-## Reportes y conducta
+Los comandos locales y sus límites están en [PRUEBAS.md](docs/PRUEBAS.md).
+Mantener documentación junto con cambios que la invaliden, enlazar fuentes y
+registrar observaciones históricas con fecha. Actualizar decisiones cuando cambie
+una frontera de gestión, permisos o ciclo de vida.
 
-Los errores reproducibles y mejoras se registran en [Issues](https://github.com/al140605/barberterraform/issues).
-Buscar duplicados e incluir entorno, resultado esperado y criterio de aceptación.
-No publicar vulnerabilidades ni secretos: usar [SECURITY](SECURITY.md).
-Respetar el [código de conducta](CODE_OF_CONDUCT.md) y su contacto privado.
+## Operaciones y seguridad
+
+Un PR aprobado o CI verde no autoriza plan conectado, importación, apply, destroy,
+migración de estado ni cambios de IAM. Seguir [OPERACION_TERRAFORM.md](docs/OPERACION_TERRAFORM.md)
+y registrar la autorización específica. Los workflows manuales permanecen bloqueados
+mientras no se acuerden permisos, protecciones y revisión del plan.
+
+Buscar duplicados antes de abrir [issues](https://github.com/al140605/barberterraform/issues).
+Incluir entorno, resultado esperado y criterio de aceptación sin datos privados.
+Los reportes de vulnerabilidades siguen [SECURITY.md](SECURITY.md); conducta e
+incidentes personales siguen [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ## Licencia de las contribuciones
 
 El proyecto adopta [GPL-3.0-only](LICENSE). Debes tener derecho a aportar el material
-bajo esa licencia. Conservar los avisos de terceros e identificar las condiciones
-de cualquier componente externo. No se exige cesión de autoría.
-Consulta [LICENSING](LICENSING.md).
-
-La licencia no otorga acceso a cuentas, credenciales, datos o servicios externos,
-ni autoriza aplicar cambios de infraestructura.
+bajo esa licencia y conservar avisos de terceros. No se exige cesión de autoría.
+El [alcance de licencia](LICENSING.md) no concede acceso a cuentas o datos ni permiso
+para aplicar infraestructura. No modificar el texto oficial de LICENSE al editar guías.

@@ -19,3 +19,6 @@ La VPC predeterminada continúa siendo un data source.
 Consultar el [inventario declarado](../docs/INFRAESTRUCTURA_STAGING.md) y el
 [registro de excepciones](../docs/EXCEPCIONES_CHECKOV.md). Esta propuesta no autoriza
 mover estado ni modificar infraestructura.
+
+La decisión y sus consecuencias están en [D07](../docs/DECISIONES_ARQUITECTURA.md#d07--extraer-módulos-cuando-exista-un-beneficio-comprobable).
+[Índice de documentación](../docs/README.md).

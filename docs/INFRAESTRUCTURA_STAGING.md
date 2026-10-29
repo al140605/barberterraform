@@ -1,6 +1,6 @@
-# Infraestructura de staging (T029)
+# Arquitectura e inventario de infraestructura
 
-Inventario derivado del código de staging, revisado el 28-oct-2026. Describe la
+Inventario derivado del código de staging, revisado el 29-oct-2026. Describe la
 arquitectura declarada y los recursos previstos para importación; no certifica
 el estado remoto ni la configuración actual de AWS/Atlas. Algunos identificadores
 están en los archivos Terraform: son metadatos de infraestructura, no credenciales.
@@ -10,35 +10,35 @@ No publicar estados, planes completos, contraseñas ni valores de secretos.
 
 ```mermaid
 flowchart LR
-    U([Usuarios]) -->|HTTPS| CF["CloudFront<br/>frontend · API · spark<br/>(T120: declarado)"]
-    CF -->|"HTTP 80 / 8080 / 8501<br/>solo rangos de CloudFront"| ALB
+    U([Usuarios]) -->|HTTPS| CF
 
-    subgraph TF ["Declarado para adopción con Terraform"]
-        ALB["ALB urbanblade-staging<br/>3 listeners HTTP"]
-        ALB -->|80| TGF["target group frontend :3000"]
-        ALB -->|8080| TGB["target group barber :80"]
-        ALB -->|8501| TGS["target group spark :8501"]
+    subgraph AWS ["AWS · recursos declarados para adopción"]
+        CF["CloudFront<br/>frontend · API · spark"]
+        CF -->|"HTTP 80 / 8080 / 8501"| ALB["ALB urbanblade-staging"]
+        ALB -->|80| TGF["Target group frontend :3000"]
+        ALB -->|8080| TGB["Target group barber :80"]
+        ALB -->|8501| TGS["Target group spark :8501"]
         TGF --> SF["ECS uba-stg-frontend"]
         TGB --> SB["ECS uba-stg-barber"]
         SF -.->|imagen| ECR[("ECR<br/>barber · frontend-urban · spark")]
         SB -.->|imagen| ECR
-        SF -.->|logs| LOG["CloudWatch Logs<br/>/ecs/urbanblade-staging/*"]
+        SF -.->|logs| LOG["CloudWatch Logs"]
         SB -.->|logs| LOG
-        SB -.->|"12 secretos"| SEC["Secrets Manager<br/>urbanblade/staging/barber/*"]
-        SG["Grupos de seguridad<br/>3 de CloudFront + tareas + heredado"] -.-> ALB
+        SB -.->|"12 contenedores de secretos"| SEC["Secrets Manager"]
+        SG["Grupos de seguridad<br/>CloudFront · tareas · heredado"] -.-> ALB
         SG -.-> SF
         SG -.-> SB
-        SB -->|archivos| UP[("S3 uploads<br/>lectura pública") ]
-        SB -->|recibos| RC[("S3 receipts<br/>privado") ]
-        ATLAS[("MongoDB Atlas M0<br/>(T118: declarado)")]
+        SB -->|archivos| UP[("S3 uploads<br/>lectura pública")]
+        SB -->|recibos| RC[("S3 receipts<br/>privado")]
     end
 
-    TGS --> SS["ECS uba-stg-spark<br/>(fuera de Terraform)"]
-    SB -->|"IP pública"| ATLAS
+    TGS --> SS["ECS uba-stg-spark<br/>fuera de esta gestión Terraform"]
+    SB -->|"IP pública"| ATLAS[("MongoDB Atlas M0<br/>declarado para adopción")]
 ```
 
-Línea continua = tráfico; punteada = uso o pertenencia. Los recursos del recuadro llevan `prevent_destroy`, salvo la
-asociación de proveedores de capacidad del clúster ECS.
+Línea continua = tráfico; punteada = uso o pertenencia. Es una vista de las
+relaciones declaradas, no una captura del entorno. No todos los recursos tienen
+prevent_destroy: comprobar la guarda en cada declaración antes de intervenir.
 
 ## Inventario declarado
 
@@ -53,7 +53,7 @@ asociación de proveedores de capacidad del clúster ECS.
 | `environments/staging` | Distribuciones de CloudFront (frontend, api, spark) | 3 importaciones | T120 |
 | `environments/staging` | Buckets S3 `uploads` y `receipts` (cifrado, bloqueo público, propiedad) y política pública de `uploads` | 2 + 6 + 1 importaciones | T120 |
 | `environments/staging` | Clúster Atlas M0 y 4 usuarios de base de datos (sin contraseñas) | 1 + 4 importaciones declaradas | T118 |
-| `environments/ephemeral` | Ambiente desechable por workspace `eph-*` | 5 recursos nuevos | T032 |
+| `environments/ephemeral` | Ambiente desechable por workspace `eph-*` | 4 por defecto, 5 con grupo opcional | T032 |
 
 Staging suma **51 importaciones** (6 + 12 + 16 + 12 + 5; la incorporación al estado no se acredita aquí). Lo que **no** está en Terraform todavía: certificados ACM, la
 lista de acceso de red de Atlas, el bucket S3 de respaldos, el servicio ECS y secretos de `spark`, así como el servicio, ECR, logs y secretos
@@ -93,22 +93,27 @@ Estas salidas exponen metadatos, no valores de secretos. Que un output no esté
 marcado sensitive no convierte el estado completo en información publicable.
 Terraform solo declara los contenedores de Secrets Manager, sin secret_version.
 
-## Evidencia por nivel
+## Fronteras de gestión y decisiones
 
-1. **Local:** formato, validate en tres raíces, prueba mock y pruebas del resumen;
-   procedimiento y límites en [CI_TERRAFORM.md](CI_TERRAFORM.md).
-2. **CI:** URL de la ejecución y SHA exacto, con todos los controles requeridos aprobados.
-   Un workflow desactivado no aporta esa evidencia.
-3. **Plan conectado, solo con autorización:** backend correcto, identidad verificada,
-   lectura de recursos y permisos necesarios para el bloqueo del estado. Un rol de
-   lectura de recursos no implica que pueda bloquear el backend S3.
-4. **Revisión:** examinar importaciones, cambios en sitio, reemplazos, eliminaciones,
-   outputs y drift. Las etiquetas del proveedor pueden proponer cambios en sitio;
-   deben quedar identificados y aprobados. Un recurso ya importado puede no aparecer
-   como una nueva importación. Conservar el plan completo únicamente en un canal privado.
-5. **Estado y operación:** outputs solo reflejan el estado disponible; no sustituyen
-   un plan actualizado ni una comprobación funcional. Una aplicación autorizada
-   necesita su propia evidencia; no se realizó durante esta revisión.
+| Área | Comportamiento declarado | Implicación |
+| --- | --- | --- |
+| ECR | Etiquetas MUTABLE y escaneo al publicar. | Migrar a etiquetas SHA y coordinar rollback de aplicación antes de exigir inmutabilidad. |
+| CloudWatch Logs | Retención de 90 días en staging. | La retención de otro entorno requiere decisión propia. |
+| ECS | ignore_changes sobre task_definition y desired_count. | El pipeline de aplicaciones controla revisiones y escala; Terraform no corrige esos atributos. |
+| Secrets Manager | Solo contenedores de doce secretos, sin secret_version. | Los valores se gestionan fuera de esta raíz. |
+| CloudFront | Redirección HTTPS al usuario, TLSv1.2_2021 y origen HTTP al ALB; políticas CachingDisabled/AllViewer. | No implica cifrado extremo a extremo. Cambiar caché u origen necesita revisar sesiones y API. |
+| S3 | uploads con lectura pública GetObject; receipts privado. | Mantener separación de contenido público y privado; no modificar políticas sin revisar consumidores. |
+| Atlas | Configuración M0 y cuatro usuarios; ignore_changes sobre password. | No gestiona contraseñas, acceso de red ni una estrategia de recuperación de datos. |
+| Etiquetas | Project, Environment y ManagedBy por proveedor. | La adopción puede proponer cambios en sitio y necesita permisos de etiquetado. |
+
+La VPC, subredes y prefix list de CloudFront se leen mediante data sources. El
+certificado ACM se referencia, no se crea aquí. Las protecciones de ciclo de vida
+no sustituyen controles nativos, backups o permisos y no impiden toda actualización.
+
+Los fundamentos y consecuencias están en [DECISIONES_ARQUITECTURA.md](DECISIONES_ARQUITECTURA.md).
+El procedimiento para revisar importaciones y operar el estado está en
+[OPERACION_TERRAFORM.md](OPERACION_TERRAFORM.md). Los niveles de evidencia y resultados
+previos están en [EVIDENCIAS.md](EVIDENCIAS.md).
 
 ## Hallazgos del código (pendientes de contraste con el entorno)
 
@@ -119,3 +124,5 @@ Terraform solo declara los contenedores de Secrets Manager, sin secret_version.
 
 El [registro de excepciones de Checkov](EXCEPCIONES_CHECKOV.md) detalla alcance,
 riesgos y criterios de revisión. Los motivos inline no acreditan aceptación del riesgo.
+
+[Índice de documentación](README.md) · [Pruebas sin nube](PRUEBAS.md).
