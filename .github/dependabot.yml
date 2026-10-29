@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Mexico_City
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci(deps)"
+  - package-ecosystem: pip
+    directory: /.github
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Mexico_City
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci(deps)"

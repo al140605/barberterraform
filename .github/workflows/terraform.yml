@@ -1,69 +1,50 @@
-# Pipeline de Terraform. Sprint 4: T137 (validacion) y T138 (plan revisable).
-#   T137: formato, validacion y analisis sin credenciales.
-#   T138: plan de staging sobre main y resumen sin valores sensibles.
-#   El apply existente es manual y requiere configurar realmente su entorno de aprobacion.
-#   Las credenciales de AWS y Atlas viven fuera del codigo.
-#
-# El repositorio es público: los registros del workflow también. Por eso el plan no se imprime; el resumen solo
-# lista la dirección y la acción de cada recurso (sin atributos) y el archivo del plan no se sube como artefacto.
-# Qué secretos, variables y entorno hay que crear: README.md, sección «Pipeline».
-name: Terraform
+# Validación sin secretos; también reutilizable por los flujos manuales.
+name: Terraform Validacion
 
 on:
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
   push:
-    branches: [ "main" ]
-    paths:
-      - "**.tf"
-      - "**.hcl"
-      - ".checkov.yaml"
-      - ".tflint.hcl"
-      - ".github/workflows/terraform.yml"
-      - "scripts/**/*.py"
-      - "tests/**/*.py"
-      - "docs/CI_TERRAFORM.md"
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      aplicar:
-        description: "Aplicar el plan de staging (pide aprobación en el entorno staging-aprobacion)"
-        type: boolean
-        default: false
-
-# Un solo plan o apply a la vez: el estado remoto se bloquea y dos corridas se estorbarían.
-concurrency:
-  group: terraform-${{ github.ref }}
-  cancel-in-progress: false
+  workflow_call:
 
 permissions:
   contents: read
+
+concurrency:
+  group: terraform-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   TF_VERSION: "1.16.2"
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
+  AWS_EC2_METADATA_DISABLED: "true"
 
 jobs:
   pruebas-resumen:
     name: Pruebas del resumen de plan (sin nube)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
+      - name: Dependencias de pruebas de política
+        run: python3 -m pip install --quiet -r .github/requirements-tests.txt
       - name: Regresiones de importaciones, acciones y datos sensibles
         run: python3 -B -m unittest discover -s tests -v
 
   formato:
     name: terraform fmt
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
@@ -73,16 +54,16 @@ jobs:
 
   validar:
     name: terraform validate (${{ matrix.dir }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         dir: [ bootstrap/state, environments/staging, environments/ephemeral ]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
@@ -101,22 +82,22 @@ jobs:
 
   analisis:
     name: tflint y checkov
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
-      - uses: terraform-linters/setup-tflint@v4
+      - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
         with:
-          tflint_version: v0.65.0
+          tflint_version: "0.65.0"
 
       # GITHUB_TOKEN evita el límite de peticiones anónimas al bajar el plugin de AWS.
       - name: tflint
@@ -132,147 +113,5 @@ jobs:
 
       - name: checkov
         run: |
-          python3 -m pip install --quiet "checkov==3.4.0"
+          python3 -m pip install --quiet -r .github/requirements-security.txt
           checkov --config-file .checkov.yaml
-
-  plan:
-    name: terraform plan (staging)
-    needs: [ formato, validar, analisis, pruebas-resumen ]
-    # Los PR se validan sin secretos, incluso si proceden del mismo repositorio.
-    # El plan real usa solo codigo revisado de main y requiere habilitacion explicita.
-    if: >-
-      vars.TERRAFORM_PLAN == 'true' &&
-      github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      TF_VAR_aws_account_id: ${{ secrets.TF_VAR_AWS_ACCOUNT_ID }}
-      TF_VAR_atlas_project_id: ${{ secrets.TF_VAR_ATLAS_PROJECT_ID }}
-      TF_VAR_atlas_cluster_name: ${{ secrets.TF_VAR_ATLAS_CLUSTER_NAME }}
-      MONGODB_ATLAS_PUBLIC_API_KEY: ${{ secrets.MONGODB_ATLAS_PUBLIC_API_KEY }}
-      MONGODB_ATLAS_PRIVATE_API_KEY: ${{ secrets.MONGODB_ATLAS_PRIVATE_API_KEY }}
-      TF_LOG: "OFF"
-    defaults:
-      run:
-        working-directory: environments/staging
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-          terraform_wrapper: false
-
-      - name: Comprobar configuracion sin mostrar valores
-        env:
-          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-          TF_BACKEND_HCL: ${{ secrets.TF_BACKEND_HCL }}
-        run: |
-          for key in AWS_ROLE_ARN TF_BACKEND_HCL TF_VAR_aws_account_id TF_VAR_atlas_project_id TF_VAR_atlas_cluster_name MONGODB_ATLAS_PUBLIC_API_KEY MONGODB_ATLAS_PRIVATE_API_KEY; do
-            if [ -z "${!key}" ]; then
-              echo "Falta configuracion requerida: $key"
-              exit 1
-            fi
-          done
-
-      # Credenciales temporales por OIDC: no se guarda ninguna llave de AWS de larga duración.
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - name: terraform init
-        env:
-          TF_BACKEND_HCL: ${{ secrets.TF_BACKEND_HCL }}
-        run: |
-          umask 077
-          mkdir -p "$RUNNER_TEMP/terraform-staging-plan"
-          printf '%s\n' "$TF_BACKEND_HCL" > "$RUNNER_TEMP/terraform-staging-plan/backend.hcl"
-          if ! terraform init -input=false -lockfile=readonly -backend-config="$RUNNER_TEMP/terraform-staging-plan/backend.hcl" > "$RUNNER_TEMP/terraform-staging-plan/init.log" 2>&1; then
-            echo "Fallo la inicializacion del backend; revisar configuracion en un canal privado."
-            exit 1
-          fi
-
-      # La salida completa del plan no se imprime (repositorio público). Con -detailed-exitcode, 0 = sin cambios,
-      # 2 = hay cambios (ambos son correctos) y 1 = error: los detalles se conservan fuera del log publico.
-      - name: terraform plan
-        run: |
-          umask 077
-          code=0
-          terraform plan -input=false -no-color -detailed-exitcode -out="$RUNNER_TEMP/terraform-staging-plan/staging.tfplan" > "$RUNNER_TEMP/terraform-staging-plan/plan.log" 2>&1 || code=$?
-          if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then
-            echo "Fallo el plan; no se publica el log porque puede contener datos sensibles."
-            exit 1
-          fi
-
-      - name: Resumen del plan
-        run: |
-          umask 077
-          plan_dir="$RUNNER_TEMP/terraform-staging-plan"
-          if ! terraform show -json "$plan_dir/staging.tfplan" > "$plan_dir/plan.json" 2> "$plan_dir/show.log"; then
-            echo "No se pudo leer el plan para generar el resumen."
-            exit 1
-          fi
-          python3 "$GITHUB_WORKSPACE/scripts/summarize_plan.py" < "$plan_dir/plan.json" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Limpiar archivos sensibles del plan
-        if: always()
-        run: |
-          plan_dir="$RUNNER_TEMP/terraform-staging-plan"
-          rm -f "$plan_dir/backend.hcl" "$plan_dir/init.log" "$plan_dir/plan.log" "$plan_dir/show.log" "$plan_dir/plan.json" "$plan_dir/staging.tfplan"
-          rmdir "$plan_dir" 2>/dev/null || true
-
-  aplicar:
-    name: terraform apply (staging)
-    needs: plan
-    # Bloqueo independiente: TERRAFORM_APPLY debe habilitarse expresamente.
-    # Solo a mano, desde main y con la casilla aplicar. Los revisores del entorno
-    # deben configurarse realmente en GitHub antes de habilitar esta variable.
-    if: >-
-      vars.TERRAFORM_APPLY == 'true' &&
-      github.event_name == 'workflow_dispatch' && inputs.aplicar &&
-      github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment: staging-aprobacion
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      TF_VAR_aws_account_id: ${{ secrets.TF_VAR_AWS_ACCOUNT_ID }}
-      TF_VAR_atlas_project_id: ${{ secrets.TF_VAR_ATLAS_PROJECT_ID }}
-      TF_VAR_atlas_cluster_name: ${{ secrets.TF_VAR_ATLAS_CLUSTER_NAME }}
-      MONGODB_ATLAS_PUBLIC_API_KEY: ${{ secrets.MONGODB_ATLAS_PUBLIC_API_KEY }}
-      MONGODB_ATLAS_PRIVATE_API_KEY: ${{ secrets.MONGODB_ATLAS_PRIVATE_API_KEY }}
-    defaults:
-      run:
-        working-directory: environments/staging
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-          terraform_wrapper: false
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - name: terraform init
-        env:
-          TF_BACKEND_HCL: ${{ secrets.TF_BACKEND_HCL }}
-        run: |
-          printf '%s\n' "$TF_BACKEND_HCL" > "$RUNNER_TEMP/backend.hcl"
-          terraform init -input=false -backend-config="$RUNNER_TEMP/backend.hcl" > /dev/null
-
-      # Se vuelve a planear justo antes de aplicar y se aplica exactamente ese plan guardado.
-      - name: terraform plan y apply
-        run: |
-          terraform plan -input=false -no-color -out=staging.tfplan > plan.log 2>&1 || { grep -E '^(Error|│ Error):' plan.log || true; exit 1; }
-          terraform apply -input=false -no-color staging.tfplan > apply.log 2>&1 || { grep -E '^(Error|│ Error):' apply.log || true; exit 1; }
-          grep -E '^Apply complete!' apply.log >> "$GITHUB_STEP_SUMMARY"

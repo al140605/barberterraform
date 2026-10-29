@@ -202,6 +202,7 @@ terraform -chdir=environments/staging validate
 terraform -chdir=environments/ephemeral init -backend=false -input=false -lockfile=readonly
 terraform -chdir=environments/ephemeral validate
 terraform -chdir=environments/ephemeral test
+python -m pip install -r .github/requirements-tests.txt
 python -B -m unittest discover -s tests -v
 terraform fmt -check -recursive
 ```
@@ -249,35 +250,50 @@ repositorio.
 
 ## Pipeline (T043 a T046)
 
-`.github/workflows/terraform.yml` define validaciones para todos los PR a main y para push a main con rutas
-relevantes. El plan exige habilitación explícita; apply requiere además ejecución
-manual y sus protecciones. El workflow figuraba desactivado en la revisión del
-28-oct-2026. Después se habilitó solo la validación, con TERRAFORM_PLAN=false;
-la evidencia y el fallo inicial de checksums están en [CI_TERRAFORM.md](docs/CI_TERRAFORM.md).
-Tener el YAML o los secretos no acredita una ejecución remota satisfactoria.
+Los flujos tienen responsabilidades y permisos separados:
 
-| Paso | Cuándo corre | Qué hace |
-|---|---|---|
-| `pruebas-resumen` (T137/T138) | Todos los PR a main y push con rutas relevantes, si Actions está habilitado | 15 pruebas sin nube |
-| `formato` (T044) | mismos eventos y filtros | `terraform fmt -check -recursive` |
-| `validar` (T044) | igual | `init -backend=false` y `validate` en `bootstrap/state`, `environments/staging` y `environments/ephemeral`; en el efímero también `terraform test` |
-| `analisis` (T030) | igual | `tflint` y `checkov` con `.tflint.hcl` y `.checkov.yaml` |
-| `plan` (T138; referencia anterior T045) | push o ejecución manual desde main y `TERRAFORM_PLAN = true` | `terraform plan` de staging; el resumen del job lista cada recurso y su acción (sin atributos) |
-| `aplicar` (T046) | solo a mano, desde `main`, con `TERRAFORM_APPLY=true` | `terraform apply` del plan, detrás del entorno `staging-aprobacion` |
+| Workflow | Cuándo corre | Acceso a nube |
+| --- | --- | --- |
+| [Terraform Validacion](.github/workflows/terraform.yml) | Todo PR y push a main; manual; reutilizable por workflow_call. | Ninguno: token contents:read, sin secretos ni OIDC. |
+| [Terraform Plan](.github/workflows/terraform-plan.yml) | Solo manual, desde main, con TERRAFORM_PLAN=true. | Rol AWS de lectura y bloqueo de estado, más lectura de Atlas. |
+| [Terraform Apply](.github/workflows/terraform-apply.yml) | Solo manual, desde main, con ambas variables en true y confirmación APLICAR staging. | Rol de aplicación, tras el entorno staging-aprobacion. |
 
-Los PR se validan sin secretos, incluidos los del mismo repositorio. El plan con credenciales se limita a código revisado de main.
+Un push o PR nunca inicia plan ni apply. Los flujos manuales reutilizan primero
+las seis validaciones sin heredar secretos y solo después permiten el job conectado.
+Se mantienen los seis nombres de checks previstos en la protección de main.
 
-`fmt`, `validate`, `tflint`, `checkov` y `terraform test` no necesitan credenciales. `plan` y `aplicar` sí, y **nada de eso va en el código** (T043). Hay que crearlo una vez en GitHub, en *Settings*:
+La validación comprueba formato, tres raíces, prueba mock del ambiente efímero,
+tflint, Checkov, resumen seguro y políticas del pipeline. Los tests de operaciones
+usan un ejecutable Terraform ficticio en Linux; no ejecutan un plan/apply real.
 
-1. **Secrets and variables > Actions > Secrets** (repositorio):
-   - `AWS_ROLE_ARN`: rol de IAM que GitHub asume por OIDC (confianza con `token.actions.githubusercontent.com`, con condición de confianza específica para cada job: rama main para plan y entorno staging-aprobacion para apply; no ampliar la confianza para resolver un rechazo).
-   - `TF_BACKEND_HCL`: contenido del `backend.hcl` de staging (ver `backend.hcl.example`).
-   - `TF_VAR_AWS_ACCOUNT_ID`, `TF_VAR_ATLAS_PROJECT_ID`, `TF_VAR_ATLAS_CLUSTER_NAME`: valores de las variables del mismo nombre.
-   - `MONGODB_ATLAS_PUBLIC_API_KEY` y `MONGODB_ATLAS_PRIVATE_API_KEY`: llaves de API de Atlas.
-2. **Variables**: `TERRAFORM_PLAN = true`, para activar el job `plan`. Mantenerla en false durante este mantenimiento. TERRAFORM_APPLY=false bloquea apply de forma independiente; no habilitarla sin autorización operativa.
-3. **Environments** (lo configura el propietario en este repositorio personal): crear `staging-aprobacion` y agregar a una o más personas en *Required reviewers*. Sin esa regla el `apply` no esperaría aprobación.
+Las Actions externas se fijan a commits completos, con versión legible en comentario,
+y usan releases Node 24 verificadas. El runner se fija en ubuntu-24.04. Dependabot
+propone actualizaciones semanales de Actions y dependencias Python de CI; no las
+fusiona ni cambia permisos automáticamente. Terraform sigue en 1.16.2, tflint en
+0.65.0 y Checkov en 3.4.0; no se actualizan proveedores de infraestructura.
 
-El `apply` nunca es automático: se lanza con *Actions > Terraform > Run workflow*, desde `main`, marcando «aplicar»; el job queda en espera hasta que una persona revisora lo apruebe **solo si esa protección está configurada realmente**. En la revisión del 28-oct-2026 GitHub devolvió cero entornos: este requisito sigue pendiente y no debe asumirse por mencionar el nombre en YAML. Como el repositorio es público, los registros también lo son: el workflow no imprime el plan ni sube el archivo del plan como artefacto.
+Configuración operativa, pendiente de revisión autorizada:
+
+1. Roles separados: AWS_PLAN_ROLE_ARN para plan y AWS_APPLY_ROLE_ARN para apply.
+   La cuenta no tiene esos secretos configurados por este mantenimiento. La
+   confianza OIDC debe distinguir rama main y entorno staging-aprobacion.
+2. TF_BACKEND_HCL, TF_VAR_AWS_ACCOUNT_ID, TF_VAR_ATLAS_PROJECT_ID,
+   TF_VAR_ATLAS_CLUSTER_NAME y llaves API de Atlas se gestionan privadamente.
+3. Mantener TERRAFORM_PLAN=false y TERRAFORM_APPLY=false. Activarlas requiere
+   autorización operativa independiente; preparar YAML no la concede.
+4. El propietario debe aplicar revisores, prevención de autoaprobación, sin bypass
+   y solo main en staging-aprobacion. Mencionar el entorno en YAML no lo protege.
+
+Plan y apply comparten una exclusión mutua sobre staging. El segundo workflow
+vuelve a generar su propio plan después de la aprobación del entorno y aplica
+exactamente ese archivo local. Esa aprobación autoriza la ejecución, no acredita
+que una persona haya revisado previamente ese plan binario concreto. Antes de
+habilitar apply hay que acordar la revisión privada y el procedimiento operativo.
+No se intercambian planes ni logs entre workflows mediante artefactos públicos.
+
+El script común usa permisos restrictivos y limpia backend temporal, plan, JSON y
+logs en éxitos y fallos. Solo publica un resumen depurado; no imprime valores del
+plan ni errores completos. Un fallo puede requerir diagnóstico privado autorizado.
 
 ## Sprint 4: validacion y plan revisable
 
