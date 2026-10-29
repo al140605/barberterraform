@@ -231,8 +231,10 @@ repositorio.
 | `formato` (T044) | cada PR y cada push a `main` | `terraform fmt -check -recursive` |
 | `validar` (T044) | igual | `init -backend=false` y `validate` en `bootstrap/state`, `environments/staging` y `environments/ephemeral`; en el efímero también `terraform test` |
 | `analisis` (T030) | igual | `tflint` y `checkov` con `.tflint.hcl` y `.checkov.yaml` |
-| `plan` (T045) | si `TERRAFORM_PLAN = true` | `terraform plan` de staging; el resumen del job lista cada recurso y su acción (sin atributos) |
+| `plan` (T138; referencia anterior T045) | push o ejecución manual desde main y `TERRAFORM_PLAN = true` | `terraform plan` de staging; el resumen del job lista cada recurso y su acción (sin atributos) |
 | `aplicar` (T046) | solo a mano, desde `main` | `terraform apply` del plan, detrás del entorno `staging-aprobacion` |
+
+Los PR se validan sin secretos, incluidos los del mismo repositorio. El plan con credenciales se limita a código revisado de main.
 
 `fmt`, `validate`, `tflint`, `checkov` y `terraform test` no necesitan credenciales. `plan` y `aplicar` sí, y **nada de eso va en el código** (T043). Hay que crearlo una vez en GitHub, en *Settings*:
 
@@ -244,7 +246,14 @@ repositorio.
 2. **Variables**: `TERRAFORM_PLAN = true`, para activar el job `plan`. Sin ella solo corren las validaciones.
 3. **Environments**: crear `staging-aprobacion` y agregar a una o más personas en *Required reviewers*. Sin esa regla el `apply` no esperaría aprobación.
 
-El `apply` nunca es automático: se lanza con *Actions > Terraform > Run workflow*, desde `main`, marcando «aplicar»; el job queda en espera hasta que una persona revisora lo apruebe. Como el repositorio es público, los registros también lo son: el workflow no imprime el plan ni sube el archivo del plan como artefacto.
+El `apply` nunca es automático: se lanza con *Actions > Terraform > Run workflow*, desde `main`, marcando «aplicar»; el job queda en espera hasta que una persona revisora lo apruebe **solo si esa protección está configurada realmente**. En la revisión del 28-oct-2026 GitHub devolvió cero entornos: este requisito sigue pendiente y no debe asumirse por mencionar el nombre en YAML. Como el repositorio es público, los registros también lo son: el workflow no imprime el plan ni sube el archivo del plan como artefacto.
+
+## Sprint 4: validacion y plan revisable
+
+La guia [CI_TERRAFORM.md](docs/CI_TERRAFORM.md) detalla T137 y T138, los contextos
+que pueden usar credenciales, el resumen seguro del plan y las evidencias necesarias
+para cerrar las tareas. Los PR se validan sin secretos; el plan real requiere main
+y habilitacion explicita.
 
 ## Políticas y licencia
 
