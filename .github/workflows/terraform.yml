@@ -12,16 +12,6 @@ name: Terraform
 on:
   pull_request:
     branches: [ "main" ]
-    paths:
-      - "**.tf"
-      - "**.hcl"
-      - "**.tftest.hcl"
-      - ".checkov.yaml"
-      - ".tflint.hcl"
-      - ".github/workflows/terraform.yml"
-      - "scripts/**/*.py"
-      - "tests/**/*.py"
-      - "docs/CI_TERRAFORM.md"
   push:
     branches: [ "main" ]
     paths:
@@ -239,9 +229,13 @@ jobs:
   aplicar:
     name: terraform apply (staging)
     needs: plan
-    # Solo a mano, desde main y con la casilla «aplicar». El entorno staging-aprobacion exige que una persona
-    # revisora lo apruebe (Settings > Environments) antes de que el job arranque.
-    if: github.event_name == 'workflow_dispatch' && inputs.aplicar && github.ref == 'refs/heads/main'
+    # Bloqueo independiente: TERRAFORM_APPLY debe habilitarse expresamente.
+    # Solo a mano, desde main y con la casilla aplicar. Los revisores del entorno
+    # deben configurarse realmente en GitHub antes de habilitar esta variable.
+    if: >-
+      vars.TERRAFORM_APPLY == 'true' &&
+      github.event_name == 'workflow_dispatch' && inputs.aplicar &&
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: staging-aprobacion
     permissions:

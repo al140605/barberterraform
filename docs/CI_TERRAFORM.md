@@ -15,9 +15,9 @@ Los estados del Excel se actualizan únicamente con evidencia del entorno corres
 
 | Contexto | Sin credenciales | Plan con credenciales | Apply |
 | --- | --- | --- | --- |
-| PR hacia main con archivos relevantes | Formato, validate, tflint, Checkov y pruebas del resumen. | No, aunque el PR proceda del mismo repositorio. | No. |
+| Todo PR hacia main | Formato, validate, tflint, Checkov y pruebas del resumen. | No, aunque el PR proceda del mismo repositorio. | No. |
 | Push de infraestructura/pipeline revisado a main | Mismos controles. | Solo con TERRAFORM_PLAN=true y configuración completa. | No. |
-| Ejecución manual desde main | Mismos controles. | Mismas condiciones. | El mecanismo existente requiere marcar aplicar y el entorno staging-aprobacion. |
+| Ejecución manual desde main | Mismos controles. | Mismas condiciones. | Exige TERRAFORM_APPLY=true, marcar aplicar y el entorno staging-aprobacion. |
 | Rama diferente de main | La validación depende del evento de PR. | No. | No. |
 
 Los PR son una superficie de código todavía no revisado: no reciben secretos del plan.
@@ -49,7 +49,7 @@ No se añaden exclusiones para ocultar hallazgos.
 ## T138: plan real y publicación del resultado
 
 El job solo puede ejecutarse desde main, tras superar los controles previos y con
-TERRAFORM_PLAN=true. Requiere los nombres siguientes; no se documentan valores:
+TERRAFORM_PLAN=true. Apply exige además TERRAFORM_APPLY=true. Requiere los nombres siguientes; no se documentan valores:
 
 - AWS_ROLE_ARN y TF_BACKEND_HCL.
 - TF_VAR_AWS_ACCOUNT_ID, TF_VAR_ATLAS_PROJECT_ID y TF_VAR_ATLAS_CLUSTER_NAME.
@@ -194,3 +194,6 @@ los hashes del mirror por sí solos no acreditan procedencia oficial.
 
 No editar hashes a mano, borrar el lockfile, usar init -upgrade ni desactivar su
 verificación para resolver un fallo. Referencia: [providers lock](https://developer.hashicorp.com/terraform/cli/commands/providers/lock).
+
+Las reglas preparadas, permisos comprobados y responsables de coordinación están en
+[PROTECCIONES_GITHUB.md](PROTECCIONES_GITHUB.md). Su aplicación administrativa sigue pendiente.

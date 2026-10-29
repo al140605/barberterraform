@@ -249,7 +249,7 @@ repositorio.
 
 ## Pipeline (T043 a T046)
 
-`.github/workflows/terraform.yml` define validaciones para PR y push a main con rutas
+`.github/workflows/terraform.yml` define validaciones para todos los PR a main y para push a main con rutas
 relevantes. El plan exige habilitación explícita; apply requiere además ejecución
 manual y sus protecciones. El workflow figuraba desactivado en la revisión del
 28-oct-2026. Después se habilitó solo la validación, con TERRAFORM_PLAN=false;
@@ -258,12 +258,12 @@ Tener el YAML o los secretos no acredita una ejecución remota satisfactoria.
 
 | Paso | Cuándo corre | Qué hace |
 |---|---|---|
-| `pruebas-resumen` (T137/T138) | PR y push a main con rutas relevantes, si Actions está habilitado | 15 pruebas sin nube |
+| `pruebas-resumen` (T137/T138) | Todos los PR a main y push con rutas relevantes, si Actions está habilitado | 15 pruebas sin nube |
 | `formato` (T044) | mismos eventos y filtros | `terraform fmt -check -recursive` |
 | `validar` (T044) | igual | `init -backend=false` y `validate` en `bootstrap/state`, `environments/staging` y `environments/ephemeral`; en el efímero también `terraform test` |
 | `analisis` (T030) | igual | `tflint` y `checkov` con `.tflint.hcl` y `.checkov.yaml` |
 | `plan` (T138; referencia anterior T045) | push o ejecución manual desde main y `TERRAFORM_PLAN = true` | `terraform plan` de staging; el resumen del job lista cada recurso y su acción (sin atributos) |
-| `aplicar` (T046) | solo a mano, desde `main` | `terraform apply` del plan, detrás del entorno `staging-aprobacion` |
+| `aplicar` (T046) | solo a mano, desde `main`, con `TERRAFORM_APPLY=true` | `terraform apply` del plan, detrás del entorno `staging-aprobacion` |
 
 Los PR se validan sin secretos, incluidos los del mismo repositorio. El plan con credenciales se limita a código revisado de main.
 
@@ -274,7 +274,7 @@ Los PR se validan sin secretos, incluidos los del mismo repositorio. El plan con
    - `TF_BACKEND_HCL`: contenido del `backend.hcl` de staging (ver `backend.hcl.example`).
    - `TF_VAR_AWS_ACCOUNT_ID`, `TF_VAR_ATLAS_PROJECT_ID`, `TF_VAR_ATLAS_CLUSTER_NAME`: valores de las variables del mismo nombre.
    - `MONGODB_ATLAS_PUBLIC_API_KEY` y `MONGODB_ATLAS_PRIVATE_API_KEY`: llaves de API de Atlas.
-2. **Variables**: `TERRAFORM_PLAN = true`, para activar el job `plan`. Sin ella solo corren las validaciones.
+2. **Variables**: `TERRAFORM_PLAN = true`, para activar el job `plan`. Mantenerla en false durante este mantenimiento. TERRAFORM_APPLY=false bloquea apply de forma independiente; no habilitarla sin autorización operativa.
 3. **Environments** (lo configura el propietario en este repositorio personal): crear `staging-aprobacion` y agregar a una o más personas en *Required reviewers*. Sin esa regla el `apply` no esperaría aprobación.
 
 El `apply` nunca es automático: se lanza con *Actions > Terraform > Run workflow*, desde `main`, marcando «aplicar»; el job queda en espera hasta que una persona revisora lo apruebe **solo si esa protección está configurada realmente**. En la revisión del 28-oct-2026 GitHub devolvió cero entornos: este requisito sigue pendiente y no debe asumirse por mencionar el nombre en YAML. Como el repositorio es público, los registros también lo son: el workflow no imprime el plan ni sube el archivo del plan como artefacto.
@@ -292,6 +292,7 @@ y habilitacion explicita.
 - [Validación y plan del Sprint 4](docs/CI_TERRAFORM.md).
 - [Excepciones de Checkov y decisiones pendientes](docs/EXCEPCIONES_CHECKOV.md).
 - [Ambiente efímero](docs/AMBIENTE_EFIMERO.md).
+- [Protecciones de GitHub y responsabilidades](docs/PROTECCIONES_GITHUB.md).
 
 ## Políticas y licencia
 
