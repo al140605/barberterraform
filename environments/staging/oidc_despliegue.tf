@@ -9,9 +9,17 @@
 
 locals {
   # Servicios que el pipeline de despliegue puede actualizar y repositorios ECR que puede escribir.
-  deploy_services     = ["barber", "frontend"]
-  deploy_ecr_repos    = ["urbanblade/barber", "urbanblade/frontend-urban"]
-  deploy_oidc_subject = [for repo in var.github_deploy_repositories : "repo:${repo}:environment:${var.github_deploy_environment}"]
+  deploy_services  = ["barber", "frontend"]
+  deploy_ecr_repos = ["urbanblade/barber", "urbanblade/frontend-urban"]
+
+  # ARN calculados por nombre y no por referencia a los recursos importados (ECR, ECS): asi este archivo se puede planear y
+  # aplicar solo, sin arrastrar la adopcion del resto de staging al estado. Los nombres son los de ecs.tf y resources.tf.
+  deploy_account_arn      = "arn:aws:%s:${var.aws_region}:${data.aws_caller_identity.current.account_id}"
+  deploy_ecr_arns         = [for name in local.deploy_ecr_repos : "${format(local.deploy_account_arn, "ecr")}:repository/${name}"]
+  deploy_ecs_cluster      = "${var.project_name}-${var.environment}"
+  deploy_ecs_cluster_arn  = "${format(local.deploy_account_arn, "ecs")}:cluster/${local.deploy_ecs_cluster}"
+  deploy_ecs_service_arns = [for key in local.deploy_services : "${format(local.deploy_account_arn, "ecs")}:service/${local.deploy_ecs_cluster}/uba-stg-${key}"]
+  deploy_oidc_subject     = [for repo in var.github_deploy_repositories : "repo:${repo}:environment:${var.github_deploy_environment}"]
 
   github_oidc_provider_arn = var.github_oidc_provider_arn != null ? var.github_oidc_provider_arn : aws_iam_openid_connect_provider.github[0].arn
 }
@@ -82,21 +90,21 @@ data "aws_iam_policy_document" "github_deploy" {
       "ecr:PutImage",
       "ecr:UploadLayerPart",
     ]
-    resources = [for name in local.deploy_ecr_repos : aws_ecr_repository.application[name].arn]
+    resources = local.deploy_ecr_arns
   }
 
   statement {
     sid       = "EcsRedesplegar"
     effect    = "Allow"
     actions   = ["ecs:UpdateService"]
-    resources = [for key in local.deploy_services : aws_ecs_service.staging[key].id]
+    resources = local.deploy_ecs_service_arns
   }
 
   statement {
     sid       = "EcsConsultarServicios"
     effect    = "Allow"
     actions   = ["ecs:DescribeServices"]
-    resources = [for key in local.deploy_services : aws_ecs_service.staging[key].id]
+    resources = local.deploy_ecs_service_arns
   }
 
   statement {
@@ -108,7 +116,7 @@ data "aws_iam_policy_document" "github_deploy" {
     condition {
       test     = "ArnEquals"
       variable = "ecs:cluster"
-      values   = [aws_ecs_cluster.staging.arn]
+      values   = [local.deploy_ecs_cluster_arn]
     }
   }
 }
