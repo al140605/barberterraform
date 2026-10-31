@@ -100,6 +100,11 @@ output "s3_bucket_names" {
 }
 
 # T118 - Atlas. Solo nombres; las cadenas de conexion llevan credenciales y no se exponen.
+output "github_deploy_role_arn" {
+  description = "Rol que asumen los workflows de despliegue por OIDC; va como variable AWS_DEPLOY_ROLE_ARN del entorno staging en GitHub (no es un secreto)."
+  value       = aws_iam_role.github_deploy.arn
+}
+
 output "atlas_cluster_name" {
   description = "Nombre del clúster de Atlas administrado."
   value       = mongodbatlas_advanced_cluster.staging.name
