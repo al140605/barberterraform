@@ -26,7 +26,8 @@ en el entorno `staging` de cada repositorio.
 ## Permisos del rol
 
 - Iniciar sesión en ECR (`ecr:GetAuthorizationToken`, que no admite restricción por recurso).
-- Leer y escribir imágenes y etiquetas **solo** en los repositorios `urbanblade/barber` y `urbanblade/frontend-urban`.
+- Leer y escribir imágenes y etiquetas **solo** en los repositorios `urbanblade/barber` y `urbanblade/frontend-urban`, y leer el
+  resultado de su escaneo de vulnerabilidades (`ecr:DescribeImageScanFindings`).
 - `ecs:UpdateService` y `ecs:DescribeServices` **solo** sobre `uba-stg-barber` y `uba-stg-frontend`.
 - `ecs:ListTasks` y `ecs:DescribeTasks` limitados al clúster `urbanblade-staging`.
 
@@ -76,6 +77,36 @@ terraform apply "oidc.tfplan"
 - En Windows PowerShell 5.1 hay que entrecomillar el argumento completo (`"-target=..."`); si no, el punto parte el argumento.
 - El plan debe mostrar solo recursos de IAM. Si propone importaciones, cambios o borrados de otros recursos, no se aplica.
 - Un plan guardado caduca si el estado cambia después de crearlo; hay que generarlo de nuevo.
+
+## Higiene de las imágenes en ECR
+
+[ecr_ciclo_de_vida.tf](../environments/staging/ecr_ciclo_de_vida.tf) añade dos cosas, también aplicables con `-target`:
+
+| Recurso | Qué hace |
+| --- | --- |
+| `aws_ecr_lifecycle_policy.deploy` (barber y frontend-urban) | Borra las imágenes **sin etiqueta con más de 14 días**, conserva las **20** etiquetas `sha-*` y las **10** `rollback-*` más recientes. No toca `latest` ni las etiquetas ajenas (por ejemplo las de despliegues manuales antiguos). |
+| `aws_ecr_registry_scanning_configuration.basic_on_push` | Escaneo básico (gratuito) de cada imagen al subirla. Es una configuración de la cuenta y la región: aplica a todos los repositorios, también spark. |
+
+Por qué hace falta: cada despliegue vuelve a subir `latest` y la imagen anterior queda sin etiqueta; además el pipeline deja una
+etiqueta `rollback-*` por despliegue. Sin política, a 31-oct-2026 había 211 imágenes de barber (81.8 GB) y 235 de frontend-urban
+(14.8 GB), tres cuartas partes sin etiqueta. Simulada con los datos reales, la política libera unos 58 GB y 8.5 GB sin borrar ninguna
+imagen con `latest` ni con otra etiqueta.
+
+Es seguro porque las definiciones de tarea (barber:12, frontend:6) usan `...:latest` y una imagen sin etiqueta no la necesita ninguna
+tarea; la reversión usa las etiquetas `rollback-*`, que se conservan. ECR aplica las políticas de forma asíncrona (puede tardar hasta
+un día) y borra de verdad: no hay papelera. Para cambiar los límites, editar `ecr_lifecycle_policy` y aplicar de nuevo.
+
+Los workflows de despliegue muestran el resumen de vulnerabilidades por severidad (crítica, alta, media…) en el resumen de la
+ejecución. Es **informativo**: nunca bloquea ni revierte un despliegue, y si el escaneo al subir aún no está activo, el paso avisa y
+sigue. Para aplicar esta parte, el rol necesita su permiso nuevo, así que se incluye el rol en el mismo `apply`:
+
+```powershell
+terraform plan "-var=aws_account_id=<cuenta>" "-var=atlas_project_id=000000000000000000000000" "-var=atlas_cluster_name=placeholder" `
+  "-target=aws_iam_role_policy.github_deploy" "-target=aws_ecr_lifecycle_policy.deploy" `
+  "-target=aws_ecr_registry_scanning_configuration.basic_on_push" "-out=ecr.tfplan"
+```
+
+El plan debe mostrar 3 por crear (dos políticas y la configuración de escaneo) y 1 por cambiar (la política del rol), y nada más.
 
 ## Estado y límites actuales
 
