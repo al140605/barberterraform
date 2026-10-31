@@ -5,7 +5,7 @@
 #   - subir imagenes y etiquetas a los repositorios ECR de barber y frontend-urban;
 #   - forzar un nuevo despliegue de los servicios uba-stg-barber y uba-stg-frontend y consultar su estado.
 # No puede leer secretos, tocar IAM, S3, la red ni registrar definiciones de tarea. Solo lo puede asumir un job que corre
-# en el entorno de GitHub `staging` de los repositorios listados (y ese entorno exige aprobacion del propietario).
+# en el entorno de GitHub `staging` de los repositorios listados (subject inmutable con IDs) (y ese entorno exige aprobacion del propietario).
 
 locals {
   # Servicios que el pipeline de despliegue puede actualizar y repositorios ECR que puede escribir.
@@ -19,7 +19,7 @@ locals {
   deploy_ecs_cluster      = "${var.project_name}-${var.environment}"
   deploy_ecs_cluster_arn  = "${format(local.deploy_account_arn, "ecs")}:cluster/${local.deploy_ecs_cluster}"
   deploy_ecs_service_arns = [for key in local.deploy_services : "${format(local.deploy_account_arn, "ecs")}:service/${local.deploy_ecs_cluster}/uba-stg-${key}"]
-  deploy_oidc_subject     = [for repo in var.github_deploy_repositories : "repo:${repo}:environment:${var.github_deploy_environment}"]
+  deploy_oidc_subject     = [for prefix in var.github_deploy_sub_prefixes : "${prefix}:environment:${var.github_deploy_environment}"]
 
   github_oidc_provider_arn = var.github_oidc_provider_arn != null ? var.github_oidc_provider_arn : aws_iam_openid_connect_provider.github[0].arn
 }
