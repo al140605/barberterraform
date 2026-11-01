@@ -204,10 +204,13 @@ resource "aws_cloudwatch_dashboard" "staging" {
           region = "us-east-1"
           stat   = "Average"
           period = 300
-          metrics = flatten([for name, group in local.alarm_target_groups : [
-            ["AWS/ECS", "CPUUtilization", "ClusterName", local.autoscaling_cluster, "ServiceName", group.service, { label = "${name} CPU" }],
-            ["AWS/ECS", "MemoryUtilization", "ClusterName", local.autoscaling_cluster, "ServiceName", group.service, { label = "${name} memoria" }]
-          ]])
+          # concat une las dos listas de series sin aplanar cada serie (flatten las convertia en una lista de textos).
+          metrics = concat(
+            [for name, group in local.alarm_target_groups :
+            ["AWS/ECS", "CPUUtilization", "ClusterName", local.autoscaling_cluster, "ServiceName", group.service, { label = "${name} CPU" }]],
+            [for name, group in local.alarm_target_groups :
+            ["AWS/ECS", "MemoryUtilization", "ClusterName", local.autoscaling_cluster, "ServiceName", group.service, { label = "${name} memoria" }]]
+          )
         }
       }
     ]
