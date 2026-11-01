@@ -13,6 +13,7 @@ necesita evidencia de GitHub o del entorno. Revisión documental: **29-oct-2026*
 | Mantener o revisar los workflows | [CI y operaciones manuales](CI_TERRAFORM.md). |
 | Preparar bootstrap, estado o importaciones autorizadas | [Operación de Terraform](OPERACION_TERRAFORM.md). |
 | Entender o cambiar el rol con el que GitHub despliega a staging por OIDC | [Despliegue a staging con OIDC](DESPLIEGUE_OIDC.md). |
+| Entender el presupuesto, las alertas y el autoescalado que limitan el costo | [Control de costos](COSTOS.md). |
 | Crear, verificar y retirar un entorno de prueba autorizado | [Ambiente efímero](AMBIENTE_EFIMERO.md). |
 | Entender las elecciones técnicas y sus límites | [Decisiones de arquitectura](DECISIONES_ARQUITECTURA.md). |
 | Revisar reglas, permisos y coordinación del equipo | [Protecciones de GitHub](PROTECCIONES_GITHUB.md). |

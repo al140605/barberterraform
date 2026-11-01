@@ -70,6 +70,51 @@ variable "github_oidc_provider_arn" {
   default     = null
 }
 
+# Control de costos (costos.tf). Los correos no se versionan: se pasan al aplicar.
+variable "budget_alert_emails" {
+  description = "Correos que reciben los avisos del presupuesto mensual. Vacio = no se crea el presupuesto."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for email in var.budget_alert_emails : can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", email))])
+    error_message = "Cada correo debe tener un formato valido (usuario@dominio)."
+  }
+}
+
+variable "budget_limit_usd" {
+  description = "Limite del presupuesto mensual en USD, con impuestos y sin restar creditos. Se calcula con el gasto estimado de un mes completo mas margen."
+  type        = number
+  default     = 120
+
+  validation {
+    condition     = var.budget_limit_usd > 0
+    error_message = "El limite del presupuesto debe ser mayor que cero."
+  }
+}
+
+variable "autoscaling_min_tasks" {
+  description = "Tareas minimas de frontend y barber (autoescalado)."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.autoscaling_min_tasks >= 1
+    error_message = "El minimo debe ser al menos 1 tarea."
+  }
+}
+
+variable "autoscaling_max_tasks" {
+  description = "Tareas maximas de frontend y barber (autoescalado). Cada tarea extra cuesta unos 22 USD al mes sin IVA si se mantiene encendida."
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.autoscaling_max_tasks >= var.autoscaling_min_tasks
+    error_message = "El maximo no puede ser menor que el minimo."
+  }
+}
+
 variable "atlas_region" {
   description = "Region de Atlas del clúster, en el formato de Atlas (por ejemplo US_EAST_1). Debe coincidir con la real."
   type        = string
