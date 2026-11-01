@@ -82,6 +82,18 @@ variable "budget_alert_emails" {
   }
 }
 
+# Alarmas de disponibilidad (alarmas.tf). Los correos no se versionan: se pasan al aplicar.
+variable "alarm_alert_emails" {
+  description = "Correos que reciben las alarmas de disponibilidad de staging (por SNS). Vacio = no se crea nada. Cada direccion debe confirmar la suscripcion desde el correo que envia AWS."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for email in var.alarm_alert_emails : can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", email))])
+    error_message = "Cada correo debe tener un formato valido (usuario@dominio)."
+  }
+}
+
 variable "budget_limit_usd" {
   description = "Limite del presupuesto mensual en USD, con impuestos y sin restar creditos. Se calcula con el gasto estimado de un mes completo mas margen."
   type        = number
