@@ -63,7 +63,7 @@ output "alb_listeners" {
 }
 
 output "target_group_arns" {
-  description = "ARN de cada target group (barber, frontend, spark)."
+  description = "ARN de cada target group (barber, frontend)."
   value       = { for name, group in aws_lb_target_group.staging : name => group.arn }
 }
 
@@ -84,7 +84,7 @@ output "barber_secret_names" {
 
 # T120 - CloudFront y S3. Nombres y dominios publicos; nada sensible.
 output "cloudfront_distributions" {
-  description = "Distribuciones de CloudFront (frontend, api, spark): ID, dominio de CloudFront y alias propios."
+  description = "Distribuciones de CloudFront (frontend, api): ID, dominio de CloudFront y alias propios."
   value = {
     for key, dist in aws_cloudfront_distribution.staging : key => {
       id      = dist.id

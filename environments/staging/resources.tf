@@ -1,14 +1,12 @@
 locals {
   ecr_repositories = toset([
     "urbanblade/barber",
-    "urbanblade/frontend-urban",
-    "urbanblade/spark"
+    "urbanblade/frontend-urban"
   ])
 
   log_groups = toset([
     "/ecs/urbanblade-staging/barber",
-    "/ecs/urbanblade-staging/frontend-urban",
-    "/ecs/urbanblade-staging/spark"
+    "/ecs/urbanblade-staging/frontend-urban"
   ])
 }
 
@@ -68,11 +66,6 @@ import {
 }
 
 import {
-  to = aws_ecr_repository.application["urbanblade/spark"]
-  id = "urbanblade/spark"
-}
-
-import {
   to = aws_cloudwatch_log_group.application["/ecs/urbanblade-staging/barber"]
   id = "/ecs/urbanblade-staging/barber"
 }
@@ -80,9 +73,4 @@ import {
 import {
   to = aws_cloudwatch_log_group.application["/ecs/urbanblade-staging/frontend-urban"]
   id = "/ecs/urbanblade-staging/frontend-urban"
-}
-
-import {
-  to = aws_cloudwatch_log_group.application["/ecs/urbanblade-staging/spark"]
-  id = "/ecs/urbanblade-staging/spark"
 }

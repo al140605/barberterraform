@@ -1,12 +1,12 @@
 # Control de costos de staging: presupuesto con alertas y autoescalado de 1 a 2 tareas en frontend y barber.
 #
 # Contexto (31-oct-2026): un credito gratuito de 100 USD cubria buena parte de la factura y se agoto. El gasto real de un mes
-# completo con 2 tareas por servicio, ollama y spark rondaba 160 USD antes de IVA. Estas dos piezas evitan la sorpresa y pagan
+# completo con 2 tareas por servicio y ollama rondaba 160 USD antes de IVA. Estas dos piezas evitan la sorpresa y pagan
 # solo la capacidad que se usa. Como oidc_despliegue.tf y ecr_ciclo_de_vida.tf, no dependen de los recursos importados de
 # staging: se nombran por cadena y se aplican con -target.
 
 locals {
-  # Servicios ECS que escalan por carga. Spark y ollama quedan fuera.
+  # Servicios ECS que escalan por carga. Ollama queda fuera.
   autoscaling_cluster  = "${var.project_name}-${var.environment}"
   autoscaling_services = { frontend = "uba-stg-frontend", barber = "uba-stg-barber" }
 
