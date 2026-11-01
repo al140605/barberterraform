@@ -13,14 +13,13 @@ flowchart LR
     U([Usuarios]) -->|HTTPS| CF
 
     subgraph AWS ["AWS · recursos declarados para adopción"]
-        CF["CloudFront<br/>frontend · API · spark"]
-        CF -->|"HTTP 80 / 8080 / 8501"| ALB["ALB urbanblade-staging"]
+        CF["CloudFront<br/>frontend · API"]
+        CF -->|"HTTP 80 / 8080"| ALB["ALB urbanblade-staging"]
         ALB -->|80| TGF["Target group frontend :3000"]
         ALB -->|8080| TGB["Target group barber :80"]
-        ALB -->|8501| TGS["Target group spark :8501"]
         TGF --> SF["ECS uba-stg-frontend"]
         TGB --> SB["ECS uba-stg-barber"]
-        SF -.->|imagen| ECR[("ECR<br/>barber · frontend-urban · spark")]
+        SF -.->|imagen| ECR[("ECR<br/>barber · frontend-urban")]
         SB -.->|imagen| ECR
         SF -.->|logs| LOG["CloudWatch Logs"]
         SB -.->|logs| LOG
@@ -32,7 +31,6 @@ flowchart LR
         SB -->|recibos| RC[("S3 receipts<br/>privado")]
     end
 
-    TGS --> SS["ECS uba-stg-spark<br/>fuera de esta gestión Terraform"]
     SB -->|"IP pública"| ATLAS[("MongoDB Atlas M0<br/>declarado para adopción")]
 ```
 
@@ -45,19 +43,19 @@ prevent_destroy: comprobar la guarda en cada declaración antes de intervenir.
 | Raíz | Recurso | Cantidad | Origen |
 | --- | --- | --- | --- |
 | `bootstrap/state` | Bucket de estado (bloqueo público, versionado, cifrado, solo TLS) | 5 recursos | base |
-| `environments/staging` | ECR (barber, frontend-urban, spark) y grupos de logs | 3 + 3 importaciones | base |
-| `environments/staging` | Grupos de seguridad | 5 importaciones | T024 |
-| `environments/staging` | ALB, target groups y listeners | 1 + 3 + 3 importaciones | T024 |
+| `environments/staging` | ECR (barber, frontend-urban) y grupos de logs | 2 + 2 importaciones | base |
+| `environments/staging` | Grupos de seguridad | 4 importaciones | T024 |
+| `environments/staging` | ALB, target groups y listeners | 1 + 2 + 2 importaciones | T024 |
 | `environments/staging` | Clúster ECS, proveedores de capacidad y servicios (barber, frontend) | 1 + 1 + 2 importaciones | T026 |
 | `environments/staging` | Secretos de barber (solo el contenedor, nunca el valor) | 12 importaciones | T026 |
-| `environments/staging` | Distribuciones de CloudFront (frontend, api, spark) | 3 importaciones | T120 |
+| `environments/staging` | Distribuciones de CloudFront (frontend, api) | 2 importaciones | T120 |
 | `environments/staging` | Buckets S3 `uploads` y `receipts` (cifrado, bloqueo público, propiedad) y política pública de `uploads` | 2 + 6 + 1 importaciones | T120 |
 | `environments/staging` | Clúster Atlas M0 y 4 usuarios de base de datos (sin contraseñas) | 1 + 4 importaciones declaradas | T118 |
 | `environments/ephemeral` | Ambiente desechable por workspace `eph-*` | 4 por defecto, 5 con grupo opcional | T032 |
 
-Staging suma **51 importaciones** (6 + 12 + 16 + 12 + 5; la incorporación al estado no se acredita aquí). Lo que **no** está en Terraform todavía: certificados ACM, la
-lista de acceso de red de Atlas, el bucket S3 de respaldos, el servicio ECS y secretos de `spark`, así como el servicio, ECR, logs y secretos
-de `ollama` (ECR y logs de `spark` sí están declarados),
+Staging suma **45 importaciones** (51 menos las 6 de spark: ECR, logs, target group, listener, grupo de seguridad y distribución; la incorporación al estado no se acredita aquí). Lo que **no** está en Terraform todavía: certificados ACM, la
+lista de acceso de red de Atlas, el bucket S3 de respaldos, así como el servicio, ECR, logs y secretos
+de `ollama`,
 roles IAM y la contraseña de cada usuario de Atlas. La VPC predeterminada se lee, no se administra.
 
 ## Variables (`environments/staging/variables.tf`)

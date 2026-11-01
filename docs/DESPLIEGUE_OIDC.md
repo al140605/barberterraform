@@ -114,7 +114,7 @@ El plan debe mostrar 3 por crear (dos políticas y la configuración de escaneo)
   declarados con bloques `import`, sin adoptar. Adoptarlos requiere su propia revisión del plan.
 - Las definiciones de tarea de ECS usan la etiqueta `latest`, que es mutable. Los workflows publican también `sha-<corto>` y
   `rollback-<fecha>-pre-<sha>`, pero pasar a etiquetas inmutables exige registrar definiciones de tarea nuevas.
-- El rol solo despliega backend y frontend. spark y ollama quedan fuera.
+- El rol solo despliega backend y frontend. ollama queda fuera.
 
 ## Primeros despliegues
 

@@ -2,7 +2,6 @@
 # Se importan SOLO los secretos (contenedores), nunca su valor. Esta prohibido declarar
 # `aws_secretsmanager_secret_version` para ellos: el valor lo gestiona otro proceso y no debe pasar por el codigo
 # ni por el estado. Las definiciones de tarea de ECS los leen por ARN.
-# Los secretos de spark (urbanblade/staging/spark/*) quedan fuera de este alcance.
 
 locals {
   barber_secrets = {

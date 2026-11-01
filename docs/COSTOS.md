@@ -25,7 +25,7 @@ duplican esos costos aunque casi no haya tráfico.
   un mes completo más un margen.
 - **Los despliegues no se cortan** con una sola tarea: los servicios usan mínimo sano 100 % y máximo 200 %, así que la tarea nueva arranca antes
   de parar la vieja.
-- Spark y ollama quedan fuera del autoescalado.
+- Ollama queda fuera del autoescalado. Spark se eliminó de staging el 31-oct-2026.
 
 ## Aplicar
 

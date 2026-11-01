@@ -3,7 +3,7 @@
 # `ecs update-service --force-new-deployment`). Por eso:
 #   - la definicion de tarea NO se administra aqui: se lee la ultima revision activa de cada familia (data source) y
 #     el servicio ignora los cambios de task_definition y desired_count;
-#   - los servicios spark y ollama quedan fuera de este alcance.
+#   - el servicio ollama queda fuera de este alcance.
 
 locals {
   ecs_services = {

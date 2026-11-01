@@ -1,20 +1,18 @@
 # T024 - ALB de staging, con sus target groups y listeners.
 # Todo existe en AWS y se IMPORTA; los valores replican lo que hay hoy para que el primer plan no proponga cambios.
-# CloudFront es quien publica estos puertos (80 frontend, 8080 API, 8501 spark); el ALB solo acepta CloudFront por
+# CloudFront es quien publica estos puertos (80 frontend, 8080 API); el ALB solo acepta CloudFront por
 # los grupos de seguridad de network.tf.
 
 locals {
   target_groups = {
     barber   = { port = 80, health_path = "/up" }
     frontend = { port = 3000, health_path = "/api/health" }
-    spark    = { port = 8501, health_path = "/_stcore/health" }
   }
 
   # Puerto del listener -> target group al que reenvia por defecto.
   alb_listeners = {
     "80"   = "frontend"
     "8080" = "barber"
-    "8501" = "spark"
   }
 }
 
@@ -103,7 +101,6 @@ import {
   for_each = {
     barber   = "arn:aws:elasticloadbalancing:us-east-1:209479293733:targetgroup/uba-stg-barber/5c76f0f4d408f965"
     frontend = "arn:aws:elasticloadbalancing:us-east-1:209479293733:targetgroup/uba-stg-frontend/e961a12ce2ed3022"
-    spark    = "arn:aws:elasticloadbalancing:us-east-1:209479293733:targetgroup/uba-stg-spark/13167ee9cdd3d424"
   }
 
   to = aws_lb_target_group.staging[each.key]
@@ -114,7 +111,6 @@ import {
   for_each = {
     "80"   = "arn:aws:elasticloadbalancing:us-east-1:209479293733:listener/app/urbanblade-staging/0e4177dc681b9f23/4079518007d80e77"
     "8080" = "arn:aws:elasticloadbalancing:us-east-1:209479293733:listener/app/urbanblade-staging/0e4177dc681b9f23/b58e7de00f503b8a"
-    "8501" = "arn:aws:elasticloadbalancing:us-east-1:209479293733:listener/app/urbanblade-staging/0e4177dc681b9f23/dde54ade0e2d9a62"
   }
 
   to = aws_lb_listener.staging[each.key]

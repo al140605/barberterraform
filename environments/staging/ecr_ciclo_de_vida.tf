@@ -9,7 +9,7 @@
 # y se puede planear y aplicar con -target sin arrastrar la adopcion del resto de staging al estado.
 
 locals {
-  # Solo los repositorios que publica el pipeline de despliegue; spark queda fuera.
+  # Solo los repositorios que publica el pipeline de despliegue.
   ecr_lifecycle_repositories = ["urbanblade/barber", "urbanblade/frontend-urban"]
 
   # ECR evalua las reglas por prioridad. Ninguna regla toca `latest` ni las etiquetas ajenas (por ejemplo las de despliegues
@@ -61,7 +61,7 @@ resource "aws_ecr_lifecycle_policy" "deploy" {
 }
 
 # Escaneo basico (gratuito) de cada imagen al subirla. Es una configuracion de la cuenta y la region, no de un repositorio:
-# aplica a todos los repositorios de ECR, incluido spark. Hoy el registro esta en BASIC sin reglas (escaneo manual).
+# aplica a todos los repositorios de ECR. Hoy el registro esta en BASIC sin reglas (escaneo manual).
 # Los workflows de despliegue muestran el resumen de vulnerabilidades en el resumen de cada ejecucion; es informativo y no
 # bloquea el despliegue.
 resource "aws_ecr_registry_scanning_configuration" "basic_on_push" {

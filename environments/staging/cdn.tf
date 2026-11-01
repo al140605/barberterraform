@@ -1,9 +1,9 @@
-# T120 - CloudFront de staging: una distribucion por servicio publico (frontend, API y spark).
-# Las tres existen en AWS y se IMPORTAN; los valores replican lo que hay hoy para que el primer plan no proponga cambios
-# (salvo las etiquetas por defecto del proveedor, que se agregan en sitio). Las tres usan el mismo origen (el ALB de
-# alb.tf) y se distinguen por el puerto del listener: 80 frontend, 8080 API, 8501 spark.
+# T120 - CloudFront de staging: una distribucion por servicio publico (frontend y API).
+# Las dos existen en AWS y se IMPORTAN; los valores replican lo que hay hoy para que el primer plan no proponga cambios
+# (salvo las etiquetas por defecto del proveedor, que se agregan en sitio). Las dos usan el mismo origen (el ALB de
+# alb.tf) y se distinguen por el puerto del listener: 80 frontend, 8080 API.
 #
-# El certificado ACM (us-east-1, con los tres dominios) se referencia por ARN: se creo y valido a mano en ACM y no se
+# El certificado ACM (us-east-1, con los dominios publicos) se referencia por ARN: se creo y valido a mano en ACM y no se
 # administra aqui. Sin cabeceras personalizadas hacia el origen: el ALB solo acepta CloudFront por grupo de seguridad.
 
 locals {
@@ -27,13 +27,6 @@ locals {
       aliases   = ["api.urbanblade.com.mx"]
       origin_id = "alb-api"
       http_port = 8080
-    }
-    spark = {
-      id        = "E1WK7UCZ9FYH79"
-      comment   = "UrbanBlade staging spark"
-      aliases   = ["spark.urbanblade.com.mx"]
-      origin_id = "alb-spark"
-      http_port = 8501
     }
   }
 }

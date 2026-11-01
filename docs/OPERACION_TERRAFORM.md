@@ -106,7 +106,7 @@ terraform -chdir=environments/staging validate
 terraform -chdir=environments/staging plan -out=staging.tfplan
 ```
 
-La raíz contempla **51 importaciones declaradas**. El número pendiente depende del
+La raíz contempla **45 importaciones declaradas**. El número pendiente depende del
 estado real; un recurso incorporado puede no aparecer como nueva importación.
 Revisar la raíz completa, no asumir que el plan se limita a ECR y logs.
 

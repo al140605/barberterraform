@@ -22,10 +22,10 @@ data "aws_ec2_managed_prefix_list" "cloudfront" {
 
 locals {
   # Un grupo de seguridad por puerto del ALB, abierto solo a CloudFront.
-  alb_cloudfront_ports = toset(["80", "8080", "8501"])
+  alb_cloudfront_ports = toset(["80", "8080"])
 
-  # Puertos de las aplicaciones (barber 80, frontend 3000, spark 8501) que el grupo de las tareas acepta del ALB.
-  task_ports = toset([80, 3000, 8501])
+  # Puertos de las aplicaciones (barber 80, frontend 3000) que el grupo de las tareas acepta del ALB.
+  task_ports = toset([80, 3000])
 }
 
 resource "aws_security_group" "alb_cloudfront" {
@@ -67,7 +67,7 @@ resource "aws_security_group" "alb_legacy" {
   vpc_id      = data.aws_vpc.default.id
 
   dynamic "ingress" {
-    for_each = toset([80, 8080, 8501])
+    for_each = toset([80, 8080])
 
     content {
       from_port   = ingress.value
@@ -133,7 +133,6 @@ import {
   for_each = {
     "80"   = "sg-0a537dcb25fcf51b2"
     "8080" = "sg-0372b1aa878f1657f"
-    "8501" = "sg-01da9703671ffd6ad"
   }
 
   to = aws_security_group.alb_cloudfront[each.key]

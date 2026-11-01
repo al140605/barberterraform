@@ -60,7 +60,7 @@ La columna de omisiones se refiere a esta corrida, no al número de anotaciones.
 | `CKV_AWS_23` | 5 | Deuda de trazabilidad | Reglas sin descripción. Añadir descripciones modifica AWS y requiere plan; no hacerlo en mantenimiento documental. |
 | `CKV_AWS_260` | 1 | Retirada por evaluar | Grupo heredado con entrada pública. El código aún lo referencia desde tareas; verificar ENI/asociaciones reales antes de retirar. |
 | `CKV_AWS_283` | 0 | Anotación sin resultado | Presente en código, sin omisión reportada por Checkov 3.4.0 en esta corrida. Revisar aplicabilidad en copia; no contar como control evaluado. |
-| `CKV_AWS_305` | 3 | Aplicabilidad por revisar | La excepción se expande a frontend, API y spark, pero el motivo solo cita Nuxt. Revisar la raíz de cada origen. |
+| `CKV_AWS_305` | 3 | Aplicabilidad por revisar | La excepción se expande a frontend y API (spark se eliminó), pero el motivo solo cita Nuxt. Revisar la raíz de cada origen. |
 | `CKV_AWS_310` | 3 | Decisión de disponibilidad | Un origen ALB; definir disponibilidad y recuperación antes de añadir failover. |
 | `CKV_AWS_333` | 2 | Decisión de red | Servicios con IP pública. Confirmar necesidad, rutas y grupos; analizar endpoints o NAT con costo y permisos. |
 | `CKV_AWS_338` | 4 | Decisión de retención | 90 días en staging y 7 en efímero; confirmar requisitos y costo, sin extrapolar a producción. |
